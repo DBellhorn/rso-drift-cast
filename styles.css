@@ -1,0 +1,230 @@
+:root {
+    --fieldset-start-width: 320px;
+    --fieldset-min-width: 260px;
+    --input-min-width: 9em;
+    --weathercock-grid-min-width: 110px;
+}
+
+body, input, label, select, table {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 1rem;
+}
+
+body {
+    text-align: center;
+    min-width: var(--fieldset-min-width);
+}
+
+header {
+    text-align: center;
+    margin: 1em;
+    padding: 1em;
+}
+
+h1 {
+    margin: 0;
+}
+
+h2 {
+    font-family: "Trade Winds", Arial, Helvetica, sans-serif;
+    font-weight: 400;
+    margin: 4px;
+    padding: 0;
+}
+
+.attribute {
+    margin: 0.5em;
+}
+
+#data-entry-section {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    column-gap: 1em;
+}
+
+fieldset {
+    border: 1px solid #ccc;
+    border-radius: 1em;
+}
+
+#fieldset_location, #fieldset-times, #fieldset-recovery, #fieldset-altitudes, #fieldset-draw-options {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    width: calc(290px - 1rem);
+    min-width: calc(var(--fieldset-min-width) - 1rem);
+}
+
+ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.radio_label {
+    min-width: 0;
+    padding-right: 0;
+}
+
+input {
+    min-width: var(--input-min-width);
+    width: var(--input-min-width);
+    box-sizing: border-box;
+
+    /* Match form field borders */
+    border: 1px solid #999;
+}
+
+.kml-option-select {
+    min-width: var(--input-min-width);
+    width: var(--input-min-width);
+}
+
+input:focus {
+    border-color: #000;
+}
+
+.waiver_input {
+    min-width: var(--input-min-width);
+}
+
+input[type='radio'], input[type='checkbox'] {
+    min-width: initial;
+    width: initial;
+}
+
+.data-input-grid-container {
+    display: grid;
+    grid-template-columns: max-content max-content;
+    align-items: center;
+    justify-items: end;
+    row-gap: 1em;
+    column-gap: 0.5em;
+    margin: 0.5em auto;
+    margin: 0 auto;
+}
+
+.deployment-type-container {
+    grid-column: 1 / -1;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+}
+
+.deployment-radio-container {
+    display: flex;
+    align-items: start;
+}
+
+.checkbox_label {
+    text-align: left;
+    padding-right: 0;
+}
+
+.recovery_input {
+    min-width: 5em;
+    width: 5em;
+}
+
+fieldset {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+}
+
+td, th {
+    border: 1px solid rgb(190,190,190);
+    padding: 10px 20px;
+}
+
+th {
+    background-color: rgb(235,235,235);
+}
+
+td {
+    text-align: center;
+}
+
+tr:nth-child(even) td {
+    background-color: rgb(250,250,250);
+}
+
+tr:nth-child(odd) td {
+    background-color: rgb(245,245,245);
+}
+
+caption {
+    padding: 10px;
+}
+
+/* Add a black background color to the top navigation */
+.topnav {
+    background-color: #333;
+    overflow: hidden;
+}
+
+/* Style the links inside the navigation bar */
+.topnav a {
+    float: left;
+    color: #f2f2f2;
+    text-align: center;
+    padding: 1rem 1rem;
+    text-decoration: none;
+    font-size: 1rem;
+}
+
+/* Change the color of links on hover */
+.topnav a:hover {
+    background-color: #ddd;
+    color: black;
+}
+
+/* Add a color to the active/current link */
+.topnav a.active {
+    background-color: #04AA6D;
+    color: white;
+}
+
+#btn_calculate_drift {
+    margin: 0.5rem;
+}
+
+@media (width < 560px) {
+    #data-entry-section {
+        flex-direction: column;
+        align-items: center;
+        row-gap: 1rem;
+    }
+
+    header {
+        margin: 0.5em;
+        padding: 0.5em;
+    }
+
+    h1 {
+        margin: 0 auto;
+        font-size: 1.25em;
+    }
+
+    h2 {
+        margin: 0 auto;
+        font-size: 1em;
+    }
+
+    .attribute {
+        margin: 0.25em;
+        font-size: 0.7em;
+    }
+
+    .topnav a {
+        padding: 0.5rem 1rem;
+    }
+}
+
+@media (width <= 400px) {
+    .topnav {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+    }
+}
