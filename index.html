@@ -21,117 +21,137 @@
         <a name="page_top"></a>
         <header>
             <h1>GPS DriftCast</h1>
-            <h2>RSO Edition</h2>
+            <span class="sub-title">RSO Edition</span>
             <p class="attribute">Weather data provided by <a href="https://open-meteo.com/">Open-Meteo</a>.</p>
         </header>
         <div id="data-entry-section">
-            <fieldset id="fieldset_location">
-                <legend>Launch Site</legend>
-                <div class="data-input-grid-container">
-                    <label for="launch_site_latitude" class="location-label">Latitude</label>
-                    <input type="text" name="launch_site_latitude" id="launch_site_latitude" value="30.614766" placeholder="Ex: 30.614631"/>
+            <div id="detail-card-container" class="detail-card-one">
+                <div class="detail-card" id="details-event">
+                    <h3 class="detail-card-title">Event Details</h3>
+                    <fieldset id="fieldset_location" class="detail-fieldset">
+                        <legend>Launch Site</legend>
+                        <div class="data-input-grid-container">
+                            <label for="launch_site_latitude" class="location-label">Latitude</label>
+                            <input type="text" name="launch_site_latitude" id="launch_site_latitude" value="30.614766" placeholder="Ex: 30.614631"/>
 
-                    <label for="launch_site_longitude" class="location-label">Longitude</label>
-                    <input type="text" name="launch_site_longitude" id="launch_site_longitude" value="-97.496783" placeholder="Ex: -97.495914"/>
+                            <label for="launch_site_longitude" class="location-label">Longitude</label>
+                            <input type="text" name="launch_site_longitude" id="launch_site_longitude" value="-97.496783" placeholder="Ex: -97.495914"/>
+                        </div>
+                    </fieldset>
+                    <fieldset id="fieldset-times" class="detail-fieldset">
+                        <legend>Launch Times</legend>
+                        <div class="data-input-grid-container">
+                            <label for="launch_date">Date</label>
+                            <input type="date" name="launch_date" id="launch_date" />
+
+                            <label for="start_time">Start Time</label>
+                            <input type="time" name="start_time" id="start_time" />
+
+                            <label for="end_time">End Time</label>
+                            <input type="time" name="end_time" id="end_time" />
+                        </div>
+                    </fieldset>
+                    <div class="detail-card-btn-container detail-card-btn-container-one">
+                        <button type="button" class="btn-next" id="btn-event-next">Next</button>
+                    </div>
                 </div>
-            </fieldset>
-            <fieldset id="fieldset-times">
-                <legend>Launch Times</legend>
-                <div class="data-input-grid-container">
-                    <label for="launch_date">Date</label>
-                    <input type="date" name="launch_date" id="launch_date" />
+                <div class="detail-card" id="details-drift">
+                    <h3 class="detail-card-title">Drift Details</h3>
+                    <fieldset id="fieldset-recovery" class="detail-fieldset">
+                        <legend>Recovery Rates</legend>
+                        <div class="data-input-grid-container">
+                            <label for="decent_rate_drogue" class="recovery_label">Drogue Decent (ft/s)</label>
+                            <input type="text" inputmode="decimal" class="recovery_input" name="decent_rate_drogue" id="decent_rate_drogue" value="75"/>
 
-                    <label for="start_time">Start Time</label>
-                    <input type="time" name="start_time" id="start_time" />
+                            <label for="decent_rate_main" class="recovery_label">Main Descent (ft/s)</label>
+                            <input type="text" inputmode="decimal" class="recovery_input" name="decent_rate_main" id="decent_rate_main" value="20" />
 
-                    <label for="end_time">End Time</label>
-                    <input type="time" name="end_time" id="end_time" />
+                            <label for="main_event_altitude" class="recovery_label">Main Event (ft AGL)</label>
+                            <input type="text" inputmode="decimal" class="recovery_input" name="main_event_altitude" id="main_event_altitude" value="750"/>
+                        </div>
+                    </fieldset>
+                    <fieldset id="fieldset-altitudes" class="detail-fieldset">
+                        <legend>Launch Altitudes</legend>
+                        <div class="data-input-grid-container">
+                            <label for="altitude-max" class="recovery_label">Maximum Altitude (ft)</label>
+                            <input type="text" inputmode="decimal" class="recovery_input" name="altitude-max" id="altitude-max" value="10000" max="101000" min="1000" step="1000">
+
+                            <label for="altitude-step" class="recovery_label">Altitude Steps (ft)</label>
+                            <input type="text" inputmode="decimal" class="recovery_input" name="altitude-step" id="altitude-step" value="2000" max="25000" min="100" step="100">
+                        </div>
+                    </fieldset>
+                    <div class="detail-card-btn-container">
+                        <button type="button" class="btn-prev" id="btn-drift-prev">Previous</button>
+                        <button type="button" class="btn-next" id="btn-drift-next">Next</button>
+                    </div>
                 </div>
-            </fieldset>
-            <fieldset id="fieldset-recovery">
-                <legend>Recovery Rates</legend>
-                <div class="data-input-grid-container">
-                    <label for="decent_rate_drogue" class="recovery_label">Drogue Decent (ft/s)</label>
-                    <input type="text" inputmode="decimal" class="recovery_input" name="decent_rate_drogue" id="decent_rate_drogue" value="75"/>
+                <div class="detail-card" id="details-draw">
+                    <h3 class="detail-card-title">Draw Options</h3>
+                    <fieldset id="fieldset-weather-options" class="detail-fieldset">
+                        <legend>Weather Options</legend>
+                        <div class="data-input-grid-container">
+                            <label for="weather-model-select" class="recovery_label">Model</label>
+                            <select name="weather-model-select" id="weather-model-select" class="kml-option-select" disabled>
+                                <option value="weather-model-auto">Best Match</option>
+                                <option value="weather-model-ecmwf">ECMWF</option>
+                                <option value="weather-model-gem" disabled>GEM</option>
+                                <option value="weather-model-noaa">GFS/HRRR</option>
+                                <option value="weather-model-icon" disabled>ICON</option>
+                            </select>
+                        </div>
+                    </fieldset>
+                    <fieldset id="fieldset-draw-options" class="detail-fieldset">
+                        <legend>Draw Options</legend>
+                        <div class="data-input-grid-container">
+                            <label for="kml-shape-select" class="recovery_label">Shapes</label>
+                            <select name="kml-shape-select" id="kml-shape-select" class="kml-option-select">
+                                <option value="kml-shape-ellipse">Ellipse</option>
+                                <option value="kml-shape-polygon">Polygon</option>
+                                <option value="kml-shape-box">Box</option>
+                                <option value="kml-shape-none">None</option>
+                            </select>
 
-                    <label for="decent_rate_main" class="recovery_label">Main Descent (ft/s)</label>
-                    <input type="text" inputmode="decimal" class="recovery_input" name="decent_rate_main" id="decent_rate_main" value="20" />
+                            <label for="kml-shape-fill-select" class="recovery_label">Fill</label>
+                            <select name="kml-shape-fill-select" id="kml-shape-fill-select" class="kml-option-select">
+                                <option value="kml-shape-fill-solid">Solid</option>
+                                <option value="kml-shape-fill-transparent">Transparent</option>
+                                <option value="kml-shape-fill-none">None</option>
+                            </select>
 
-                    <label for="main_event_altitude" class="recovery_label">Main Event (ft AGL)</label>
-                    <input type="text" inputmode="decimal" class="recovery_input" name="main_event_altitude" id="main_event_altitude" value="750"/>
+                            <label for="kml-path-select" class="recovery_label">Paths</label>
+                            <select name="kml-path-select" id="kml-path-select" class="kml-option-select">
+                                <option value="kml-path-ground">Ground</option>
+                                <option value="kml-path-flight">Flight</option>
+                                <option value="kml-path-both">Both</option>
+                                <option value="kml-path-none">None</option>
+                            </select>
+
+                            <label for="kml-marker-select" class="recovery_input">Markers</label>
+                            <select name="kml-marker-select" id="kml-marker-select" class="kml-option-select">
+                                <option value="kml-marker-none">None</option>
+                                <option value="kml-marker-time">Times</option>
+                                <option value="kml-marker-no-label">No Labels</option>
+                            </select>
+                        </div>
+                    </fieldset>
+                    <div class="detail-card-btn-container">
+                        <button type="button" class="btn-prev" id="btn-draw-prev">Previous</button>
+                        <button type="button" class="btn-next" id="btn-calculate-drift" disabled>Calculate Drift</button>
+                    </div>
                 </div>
-            </fieldset>
-            <fieldset id="fieldset-altitudes">
-                <legend>Launch Altitudes</legend>
-                <div class="data-input-grid-container">
-                    <label for="altitude-max" class="recovery_label">Maximum Altitude (ft)</label>
-                    <input type="text" inputmode="decimal" class="recovery_input" name="altitude-max" id="altitude-max" value="10000" max="101000" min="1000" step="1000">
-
-                    <label for="altitude-step" class="recovery_label">Altitude Steps (ft)</label>
-                    <input type="text" inputmode="decimal" class="recovery_input" name="altitude-step" id="altitude-step" value="2000" max="25000" min="100" step="100">
-                </div>
-            </fieldset>
-            <fieldset id="fieldset-weather-options">
-                <legend>Weather Options</legend>
-                <div class="data-input-grid-container">
-                    <label for="weather-model-select" class="recovery_label">Model</label>
-                    <select name="weather-model-select" id="weather-model-select" class="kml-option-select">
-                        <option value="weather-model-auto">Best Match</option>
-                        <option value="weather-model-ecmwf">ECMWF</option>
-                        <option value="weather-model-gem" disabled>GEM</option>
-                        <option value="weather-model-noaa">GFS/HRRR</option>
-                        <option value="weather-model-icon" disabled>ICON</option>
-                    </select>
-
-                    <label for="weather-speed-select" class="recovery_label">Speed Units</label>
-                    <select name="weather-speed-select" id="weather-speed-select" class="kml-option-select" disabled>
-                        <option value="weather-speed-mph">Miles Per Hour</option>
-                        <option value="weather-speed-kph">Kilometers Per Hour</option>
-                        <option value="weather-speed-knots">Knots</option>
-                        <option value="weather-speed-mps">Meters Per Second</option>
-                    </select>
-                </div>
-            </fieldset>
-            <fieldset id="fieldset-draw-options">
-                <legend>Draw Options</legend>
-                <div class="data-input-grid-container">
-                    <label for="kml-shape-select" class="recovery_label">Shapes</label>
-                    <select name="kml-shape-select" id="kml-shape-select" class="kml-option-select">
-                        <option value="kml-shape-ellipse">Ellipse</option>
-                        <option value="kml-shape-polygon">Polygon</option>
-                        <option value="kml-shape-box">Box</option>
-                        <option value="kml-shape-none">None</option>
-                    </select>
-
-                    <label for="kml-shape-fill-select" class="recovery_label">Fill</label>
-                    <select name="kml-shape-fill-select" id="kml-shape-fill-select" class="kml-option-select">
-                        <option value="kml-shape-fill-solid">Solid</option>
-                        <option value="kml-shape-fill-transparent">Transparent</option>
-                        <option value="kml-shape-fill-none">None</option>
-                    </select>
-
-                    <label for="kml-path-select" class="recovery_label">Paths</label>
-                    <select name="kml-path-select" id="kml-path-select" class="kml-option-select">
-                        <option value="kml-path-ground">Ground</option>
-                        <option value="kml-path-flight">Flight</option>
-                        <option value="kml-path-both">Both</option>
-                        <option value="kml-path-none">None</option>
-                    </select>
-
-                    <label for="kml-marker-select" class="recovery_input">Markers</label>
-                    <select name="kml-marker-select" id="kml-marker-select" class="kml-option-select">
-                        <option value="kml-marker-none">None</option>
-                        <option value="kml-marker-time">Times</option>
-                        <option value="kml-marker-no-label">No Labels</option>
-                    </select>
-                </div>
-            </fieldset>
+            </div>
         </div>
         <div>
-            <button type="button" id="btn_calculate_drift">Calculate Drift</button>
+            <h3 id="status-display" hidden>Let's get started!</h3>
         </div>
-        <div>
-            <h3 id="status_display" hidden="true">Calculating drift...</h3>
+        <div id="weather-display-wrapper" hidden>
+            <label for="weather-speed-select" class="recovery_label">Speed Units</label>
+            <select name="weather-speed-select" id="weather-speed-select" class="kml-option-select" disabled>
+                <option value="weather-speed-mph">Miles Per Hour</option>
+                <option value="weather-speed-kph">Kilometers Per Hour</option>
+                <option value="weather-speed-knots">Knots</option>
+                <option value="weather-speed-mps">Meters Per Second</option>
+            </select>
         </div>
         <script type="module" src="main.js"></script>
     </body>

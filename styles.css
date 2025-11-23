@@ -1,8 +1,10 @@
 :root {
     --fieldset-start-width: 320px;
-    --fieldset-min-width: 260px;
+    --fieldset-min-width: 270px;
     --input-min-width: 9em;
     --weathercock-grid-min-width: 110px;
+    --detail-card-width: 275px;
+    --detail-card-height: 380px;
 }
 
 body, input, label, select, table {
@@ -25,8 +27,9 @@ h1 {
     margin: 0;
 }
 
-h2 {
+.sub-title {
     font-family: "Trade Winds", Arial, Helvetica, sans-serif;
+    font-size: 1.5em;
     font-weight: 400;
     margin: 4px;
     padding: 0;
@@ -39,21 +42,85 @@ h2 {
 #data-entry-section {
     display: flex;
     flex-direction: row;
-    flex-wrap: wrap;
+    justify-content: start;
+    width: calc(var(--detail-card-width) + 1em);
+    margin: 0 auto;
+    overflow: hidden;
+    transition: all 4s;
+    /* outline: 1px dashed blue; */
+}
+
+#detail-card-container {
+    display: flex;
+    position: relative;
+    /* top: 0; */
+    /* left: 0; */
+    /* left: calc(calc(-2 * var(--detail-card-width) - 1.5em)); */
+    flex-direction: row;
     justify-content: center;
     column-gap: 1em;
+    margin: 0 0.5em;
+    transition: left 0.4s;
+}
+
+.detail-card-one {
+    left: 0;
+}
+
+.detail-card-two {
+    left: -291px;
+}
+
+.detail-card-three {
+    left: -582px;
 }
 
 fieldset {
     border: 1px solid #ccc;
-    border-radius: 1em;
+    border-radius: 0.5em;
 }
 
-#fieldset_location, #fieldset-times, #fieldset-recovery, #fieldset-altitudes, #fieldset-draw-options {
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
-    width: calc(290px - 1rem);
+/*#fieldset_location, #fieldset-times, #fieldset-recovery, #fieldset-altitudes, #fieldset-draw-options {*/
+/*
+.detail-fieldset {
+    width: 100px;
     min-width: calc(var(--fieldset-min-width) - 1rem);
+    padding: 1rem 0.5rem;
+}
+*/
+.detail-card {
+    width: var(--detail-card-width);
+    height: var(--detail-card-height);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.detail-card-title {
+    text-decoration: underline;
+}
+
+.detail-card-btn-container {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin: 0.5rem 0;
+}
+
+.detail-card-btn-container-one {
+  justify-content: end;
+}
+
+.btn-prev, .btn-next {
+    width: 110px;
+}
+
+.btn-prev {
+    align-self: start;
+}
+
+.btn-next {
+    align-self: end;
 }
 
 ul {
@@ -184,10 +251,6 @@ caption {
 .topnav a.active {
     background-color: #04AA6D;
     color: white;
-}
-
-#btn_calculate_drift {
-    margin: 0.5rem;
 }
 
 @media (width < 560px) {

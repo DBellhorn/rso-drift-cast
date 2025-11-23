@@ -6,6 +6,15 @@ import { getOpenMeteoWindPredictionData } from "./wind.js";
 import { AltitudeDriftResult, driftSimulation } from './drift_simulation.js';
 import { RocketApogee } from './rocket.js';
 
+// Container of all detail cards
+const dataEntrySection = document.getElementById('data-entry-section');
+const detailCardContainer = document.getElementById('detail-card-container');
+
+// Class names for displaying individual detail cards
+const eventDetailCardClass = 'detail-card-one';
+const driftDetailCardClass = 'detail-card-two';
+const drawDetailCardClass = 'detail-card-three';
+
 // Launch site input elements
 const launchSiteLatitudeElement = document.getElementById('launch_site_latitude');
 const launchSiteLongitudeElement = document.getElementById('launch_site_longitude');
@@ -33,10 +42,19 @@ const kmlPathSelect = document.getElementById('kml-path-select');
 const kmlMarkerSelect = document.getElementById('kml-marker-select');
 
 // Button elements
-const calculateDriftButton = document.getElementById('btn_calculate_drift');
+const eventNextButton = document.getElementById('btn-event-next');
+const driftPreviousButton = document.getElementById('btn-drift-prev');
+const driftNextButton = document.getElementById('btn-drift-next');
+const drawPreviousButton = document.getElementById('btn-draw-prev');
+const calculateDriftButton = document.getElementById('btn-calculate-drift');
 
 // Drift result display elements
-const statusDisplayElement = document.getElementById('status_display');
+const statusDisplayElement = document.getElementById('status-display');
+
+/**
+ * @type {Array.<WindForecastData>}
+ */
+let windForecastList = [];
 
 /**
  * Stores the results of wind drift simulation from a specific altitude
@@ -54,6 +72,12 @@ const maxDaysFutureOpenMeteo = 15;
  * @type {LaunchLocationData}
  */
 let launchLocationDetails = null;
+
+/**
+ * Stores all date and time values that a launch is active.
+ * @type {LaunchTimeData}
+ */
+let launchTimes = null;
 
 /**
  * Update the value stored and displayed in the launch end time field.
@@ -95,12 +119,22 @@ function getLaunchSiteLocation() {
 }
 
 /**
+ * Change the text content of the status-display element and ensure it is visible.
+ * @param {string} statusMessage - The text to be displayed within the element
+ */
+function updateStatusDisplay(statusMessage) {
+    statusDisplayElement.textContent = statusMessage;
+    statusDisplayElement.hidden = false;
+    statusDisplayElement.scrollIntoView({ behavior: "instant", block: "end" });
+}
+
+/**
  * Fired when the whole page has loaded, including all dependent resources except
  * those that are loaded lazily.
  */
 window.onload = () => {
     // Print a version into the log to help keep track between iterations.
-    console.log('GPS DriftCast - RSO Edition 0.1');
+    console.log('GPS DriftCast - RSO Edition 0.2');
 
     const currentDate = new Date();
 
@@ -202,13 +236,28 @@ window.onload = () => {
         );
     });
 
+    eventNextButton.addEventListener('click', () => {
+        processEventDetails();
+    });
+
+    driftPreviousButton.addEventListener('click', () => {
+        detailCardContainer.classList.remove(driftDetailCardClass);
+        detailCardContainer.classList.add(eventDetailCardClass);
+    });
+
+    driftNextButton.addEventListener('click', () => {
+        detailCardContainer.classList.remove(driftDetailCardClass);
+        detailCardContainer.classList.add(drawDetailCardClass);
+    });
+
+    drawPreviousButton.addEventListener('click', () => {
+        detailCardContainer.classList.remove(drawDetailCardClass);
+        detailCardContainer.classList.add(driftDetailCardClass);
+    });
+
     calculateDriftButton.addEventListener('click', async () => {
         // Let the user know something is happening in the background.
-        if (null != statusDisplayElement) {
-            statusDisplayElement.textContent = 'Calculating drift...';
-            statusDisplayElement.hidden = false;
-            statusDisplayElement.scrollIntoView({ behavior: "instant", block: "end" });
-        }
+        updateStatusDisplay('Calculating drift...');
 
         // Calculate new drift and landing results
         calculateDriftResults();
@@ -216,27 +265,32 @@ window.onload = () => {
 }
 
 /**
- * Requests a file name and location for later saving the generated KML file.
- * Reads in all information entered int our UI by the user.
- * Perform drift simulations for all provided altitudes.
- * Use the resulting data to generate a KML file and save it.
+ * Reads and verifies data from the Event Details card.  Report any errors to
+ * the user.  If everything looks okay, send the weather forecast request to
+ * Open-Meteo before transitioning to the Drift Details card.
  */
-async function calculateDriftResults() {
-    const launchTimes = new LaunchTimeData( launchDateElement.value,
-                                            startTimeElement.value,
-                                            endTimeElement.value);
+async function processEventDetails() {
+    launchTimes = null;
+    try {
+        launchTimes = new LaunchTimeData( launchDateElement.value,
+                                        startTimeElement.value,
+                                        endTimeElement.value);
+    } catch (e) {
+        updateStatusDisplay(e.message);
+        return;
+    }
 
     // Verify the launch hour offsets are within our expectations
     if ((launchTimes.endHour < launchTimes.startHour) && (launchTimes.endHour > 0)) {
-        statusDisplayElement.textContent = 'The launch cannot end before it starts.';
+        updateStatusDisplay('The launch cannot end before it starts.');
         return;
     }
     if (launchTimes.startHourOffset < (-24 * maxDaysPreviousOpenMeteo)) {
-        statusDisplayElement.textContent = `Wind speeds older than ${maxDaysPreviousOpenMeteo} days are not available.`;
+        updateStatusDisplay(`Wind speeds older than ${maxDaysPreviousOpenMeteo} days are not available.`);
         return;
     }
     if (launchTimes.endHourOffset > (24 * maxDaysFutureOpenMeteo)) {
-        statusDisplayElement.textContent = `Cannot forecast more than ${maxDaysFutureOpenMeteo} days into the future.`;
+        updateStatusDisplay(`Cannot forecast more than ${maxDaysFutureOpenMeteo} days into the future.`);
         return;
     }
 
@@ -248,67 +302,111 @@ async function calculateDriftResults() {
         return;
     }
 
-    statusDisplayElement.textContent = 'Waiting for wind forecast...';
+    // Ensure the user is unable to trigger KML generation before the wind data is ready
+    calculateDriftButton.disabled = true;
+
+    // Transition the UI to display our Drift Details card
+    detailCardContainer.classList.remove(eventDetailCardClass);
+    detailCardContainer.classList.add(driftDetailCardClass);
+
+    // Let the user know we have requested the weather forecast data
+    updateStatusDisplay('Waiting for wind forecast...');
 
     // Find out if the user prefers a certain weather model.
     // Open-Meteo actually allows multiple options within a single request, so we can
     // just ask for everything and apply filters in our simulation in the future.
     let weatherModel = 'best_match';
-    switch (weatherModelSelect.value) {
-        case 'weather-model-ecmwf':
-            weatherModel = 'ecmwf_ifs025';
-            break;
-        case 'weather-model-gem':
-            weatherModel = 'gem_seamless';
-            break;
-        case 'weather-model-noaa':
-            weatherModel = 'gfs_seamless';
-            break;
-        case 'weather-model-icon':
-            weatherModel = 'icon_seamless';
-            break;
+    // switch (weatherModelSelect.value) {
+    //     case 'weather-model-ecmwf':
+    //         weatherModel = 'ecmwf_ifs025';
+    //         break;
+    //     case 'weather-model-gem':
+    //         weatherModel = 'gem_seamless';
+    //         break;
+    //     case 'weather-model-noaa':
+    //         weatherModel = 'gfs_seamless';
+    //         break;
+    //     case 'weather-model-icon':
+    //         weatherModel = 'icon_seamless';
+    //         break;
+    // }
+
+    // Clear out any older wind forecasts
+    windForecastList = [];
+
+    // Perform up to three requests for weather predition data from Open-Meteo
+    windForecastList = await getOpenMeteoWindPredictionData(launchLocation, launchTimes, weatherModel);
+    if (null == windForecastList) {
+        updateStatusDisplay('Sending another request for wind forecast...');
+
+        windForecastList = await getOpenMeteoWindPredictionData(launchLocation, launchTimes, weatherModel);
+        if (null == windForecastList) {
+            updateStatusDisplay('Final attempt for wind forecast...');
+
+            windForecastList = await getOpenMeteoWindPredictionData(launchLocation, launchTimes, weatherModel);
+            if (null == windForecastList) {
+                updateStatusDisplay('Wind forecast is not available!');
+                return;
+            }
+        }
     }
 
-    const windForecastList = await getOpenMeteoWindPredictionData(launchLocation, launchTimes, weatherModel);
-    if (null == windForecastList) {
-        statusDisplayElement.textContent = 'Wind forecast request failed.';
+    // Instantiate a new object to store the current launch event's details.
+    launchLocationDetails = new LaunchLocationData(launchLocation, windForecastList[0].groundElevation, '');
+
+    // Everything worked as expected.  Allow the user to request drift simulation results.
+    updateStatusDisplay('Wind forecast is ready.');
+    calculateDriftButton.disabled = false;
+}
+
+/**
+ * Requests a file name and location for later saving the generated KML file.
+ * Reads in all information entered int our UI by the user.
+ * Perform drift simulations for all provided altitudes.
+ * Use the resulting data to generate a KML file and save it.
+ */
+async function calculateDriftResults() {
+    // Verify the launch event location is valid
+    if (null == launchLocationDetails) {
+        updateStatusDisplay('Unable to calculate drift without a valid event location.');
         return;
     }
 
-    statusDisplayElement.textContent = 'Beginning drift simulation...'
-    
-    // Instantiate a new object to store the current launch event's details.
-    launchLocationDetails = new LaunchLocationData(launchLocation, windForecastList[0].groundElevation, '');
+    // Verify the launch event date and times are valid
+    if (null == launchTimes) {
+        updateStatusDisplay('Unable to calculate drift without a valid date and time range.');
+        return;
+    }
 
     // Read in all of the expected descent rate values
     const drogueDecentRate = Math.abs(parseInt(drogueDecentRateElement.value));
     if (isNaN(drogueDecentRate) || drogueDecentRate <= 0.0) {
-        statusDisplayElement.textContent = `Unable to calculate drift distance with an invalid main decent rate: ${drogueDecentRate}`;
+        updateStatusDisplay(`Unable to calculate drift distance with an invalid main decent rate: ${drogueDecentRate}`);
         return;
     }
 
     const mainDescentRate = parseFloat(mainDescentRateElement.value);
     if (isNaN(mainDescentRate) || mainDescentRate <= 0.0) {
-        statusDisplayElement.textContent = `Unable to calculate drift distance with an invalid main decent rate: ${mainDescentRate}`;
+        updateStatusDisplay(`Unable to calculate drift distance with an invalid main decent rate: ${mainDescentRate}`);
         return;
     }
 
     const mainDeployAltitude = Math.abs(parseInt(mainEventAltitudeElement.value.replaceAll(',', '')));
     if (isNaN(mainDeployAltitude) || mainDeployAltitude <= 0.0) {
-        statusDisplayElement.textContent = `Unable to calculate drift distance with an invalid main decent rate: ${mainDeployAltitude}`;
+        updateStatusDisplay(`Unable to calculate drift distance with an invalid main decent rate: ${mainDeployAltitude}`);
         return;
     }
 
     // Read in the values needed to produce the launch's altitude bands
     const launchAltMax = Math.abs(parseInt(launchAltitudeMaxElement.value.replaceAll(',', '')));
     if (isNaN(launchAltMax) || launchAltMax <= 0 || launchAltMax > 101000) {
-        statusDisplayElement.textContent = `Unable to calculate drift distance with an invalid maximum launch altitude: ${launchAltMax}`;
+        updateStatusDisplay(`Unable to calculate drift distance with an invalid maximum launch altitude: ${launchAltMax}`);
         return;
     }
 
     const launchAltStep = Math.abs(parseInt(launchAltitudeStepElement.value.replaceAll(',', '')));
     if (isNaN(launchAltStep)) {
-        statusDisplayElement.textContent = `Unable to calculate drift distance with an invalid launch altitude step: ${launchAltStep}`;
+        updateStatusDisplay(`Unable to calculate drift distance with an invalid launch altitude step: ${launchAltStep}`);
         return;
     }
 
@@ -367,7 +465,7 @@ async function calculateDriftResults() {
     });
 
     if (altitudeDriftResults.length > 0) {
-        statusDisplayElement.textContent = 'Drift simulation complete.'
+        updateStatusDisplay('Drift simulation complete.');
 
         // Identify which KML drawing options the user selected beginning with the shape
         let kmlShapeType = DrawShapeTypes.ELLIPSE;
@@ -409,6 +507,6 @@ async function calculateDriftResults() {
         saveKmlFile(kmlBlob);
     } else {
         // Let the user know something bad happened.
-        statusDisplayElement.textContent = 'An error occurred.'
+        updateStatusDisplay('An error occurred.');
     }
 }
