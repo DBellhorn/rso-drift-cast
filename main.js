@@ -1,7 +1,7 @@
 import { GeoLocation } from "./geo.js";
 import { DrawShapeTypes, ShapeFillTypes, DrawPathTypes, DrawMarkerTypes, createAltitudeDriftDocument, saveKmlFile } from "./kml.js";
 import { LaunchTimeData, LaunchLocationData } from "./launch.js";
-import { getOpenMeteoWindPredictionData } from "./wind.js";
+import { WindForecastData, getOpenMeteoWindPredictionData } from "./wind.js";
 
 import { AltitudeDriftResult, driftSimulation } from './drift_simulation.js';
 import { RocketApogee } from './rocket.js';
@@ -52,9 +52,10 @@ const calculateDriftButton = document.getElementById('btn-calculate-drift');
 const statusDisplayElement = document.getElementById('status-display');
 
 /**
- * @type {Array.<WindForecastData>}
+ * Store all wind data from various weather forecast models obtained from Open-Meteo
+ * @type {WindForecastData}
  */
-let windForecastList = [];
+let windModelForecasts = null;
 
 /**
  * Stores the results of wind drift simulation from a specific altitude
@@ -134,7 +135,7 @@ function updateStatusDisplay(statusMessage) {
  */
 window.onload = () => {
     // Print a version into the log to help keep track between iterations.
-    console.log('GPS DriftCast - RSO Edition 0.2');
+    console.log('GPS DriftCast - RSO Edition 0.3');
 
     const currentDate = new Date();
 
@@ -312,47 +313,49 @@ async function processEventDetails() {
     // Let the user know we have requested the weather forecast data
     updateStatusDisplay('Waiting for wind forecast...');
 
-    // Find out if the user prefers a certain weather model.
-    // Open-Meteo actually allows multiple options within a single request, so we can
-    // just ask for everything and apply filters in our simulation in the future.
-    let weatherModel = 'best_match';
-    // switch (weatherModelSelect.value) {
-    //     case 'weather-model-ecmwf':
-    //         weatherModel = 'ecmwf_ifs025';
-    //         break;
-    //     case 'weather-model-gem':
-    //         weatherModel = 'gem_seamless';
-    //         break;
-    //     case 'weather-model-noaa':
-    //         weatherModel = 'gfs_seamless';
-    //         break;
-    //     case 'weather-model-icon':
-    //         weatherModel = 'icon_seamless';
-    //         break;
-    // }
-
-    // Clear out any older wind forecasts
-    windForecastList = [];
-
     // Perform up to three requests for weather predition data from Open-Meteo
-    windForecastList = await getOpenMeteoWindPredictionData(launchLocation, launchTimes, weatherModel);
-    if (null == windForecastList) {
+    windModelForecasts = await getOpenMeteoWindPredictionData(launchLocation, launchTimes);
+    if (null == windModelForecasts) {
         updateStatusDisplay('Sending another request for wind forecast...');
 
-        windForecastList = await getOpenMeteoWindPredictionData(launchLocation, launchTimes, weatherModel);
-        if (null == windForecastList) {
+        windModelForecasts = await getOpenMeteoWindPredictionData(launchLocation, launchTimes);
+        if (null == windModelForecasts) {
             updateStatusDisplay('Final attempt for wind forecast...');
 
-            windForecastList = await getOpenMeteoWindPredictionData(launchLocation, launchTimes, weatherModel);
-            if (null == windForecastList) {
+            windModelForecasts = await getOpenMeteoWindPredictionData(launchLocation, launchTimes);
+            if (null == windModelForecasts) {
                 updateStatusDisplay('Wind forecast is not available!');
                 return;
             }
         }
     }
 
+    // Enable/disable which weather models are selectable based on what wind data is available
+    const availableModelNames = windModelForecasts.getModelNames();
+
+    for (let i = 0; i < weatherModelSelect.options.length; i++) {
+        switch (weatherModelSelect.options[i].value) {
+            case 'weather-model-auto': {
+                weatherModelSelect.options[i].disabled = !availableModelNames.includes('best_match');
+                break;
+            }
+            case 'weather-model-ecmwf': {
+                weatherModelSelect.options[i].disabled = !availableModelNames.includes('ecmwf_ifs025');
+                break;
+            }
+            case 'weather-model-noaa': {
+                weatherModelSelect.options[i].disabled = !availableModelNames.includes('gfs_seamless');
+                break;
+            }
+            case 'weather-model-icon': {
+                weatherModelSelect.options[i].disabled = !availableModelNames.includes('icon_seamless');
+                break;
+            }
+        }
+    }
+
     // Instantiate a new object to store the current launch event's details.
-    launchLocationDetails = new LaunchLocationData(launchLocation, windForecastList[0].groundElevation, '');
+    launchLocationDetails = new LaunchLocationData(launchLocation, windModelForecasts.getGroundElevation(), '');
 
     // Everything worked as expected.  Allow the user to request drift simulation results.
     updateStatusDisplay('Wind forecast is ready.');
@@ -429,6 +432,14 @@ async function calculateDriftResults() {
         altitudeBands.push(launchAltMax);
     }
 
+    // Check which weather model the user would like to use for this drift simulation
+    let weatherModelName = 'best_match';
+    switch (weatherModelSelect.value) {
+        case 'weather-model-ecmwf': { weatherModelName = 'ecmwf_ifs025'; break; }
+        case 'weather-model-noaa': { weatherModelName = 'gfs_seamless'; break; }
+        case 'weather-model-icon': { weatherModelName = 'icon_seamless'; break; }
+    }
+
     // Clear out any previous drift results from previous simulations
     altitudeDriftResults = [];
 
@@ -441,7 +452,9 @@ async function calculateDriftResults() {
 
         let forecastHour = new Date(launchTimes.launchDate);
 
-        windForecastList.forEach((windForecast) => {
+        const windModelForecast = windModelForecasts.getWindModelForecast(weatherModelName);
+
+        windModelForecast.forEach((windForecast) => {
             if (null == windForecast || 0 == windForecast.length) {
                 console.debug('Failed to obtain a wind forecast.');
                 simulationList.push(null);
