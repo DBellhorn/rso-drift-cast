@@ -171,6 +171,28 @@ class LaunchTimeData {
         const endUTCMonth = this.#endDateWithHour.getUTCMonth() + 1;
         return `${this.#endDateWithHour.getUTCFullYear()}-${endUTCMonth.toString().padStart(2, '0')}-${this.#endDateWithHour.getUTCDate().toString().padStart(2, '0')}T${this.#endDateWithHour.getUTCHours().toString().padStart(2, '0')}:00`;
     }
+
+    /**
+     * Provides a list of all included hours as displayable strings.
+     * @returns {Array.<string>}
+     */
+    getLaunchTimesList() {
+        const timeList = [];        
+        const endHour = this.#endDateWithHour.getHours();
+
+        for (let currentHour = this.#launchDate.getHours(); currentHour <= endHour; currentHour++) {
+            if (0 == currentHour) {
+                timeList.push('12AM');
+            } else if (12 == currentHour) {
+                timeList.push('12PM');
+            } else if (currentHour > 12) {
+                timeList.push(`${currentHour - 12}PM`);
+            } else {
+                timeList.push(`${currentHour}AM`);
+            }
+        }
+        return timeList;
+    }
 }
 
 /* Contains the coordinates and altitude defining a single point along the rocket's launch path. */

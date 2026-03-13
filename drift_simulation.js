@@ -161,7 +161,7 @@ function driftSimulation(launchDetails, launchTime, rocketDetails, windForecast)
 
     
     // Convert wind speed to MPH for comparison with user supplied values
-    const groundWindSpeed = Math.round(windForecast.windData[0].windSpeed * 1.15078);
+    const groundWindSpeed = Math.round(windForecast.windData[0].getWindSpeedMph());
 
     // Create an object to hold this simulation's results now that we have some data
     const launchSimulation = new LaunchSimulationData(launchDetails.altitude,

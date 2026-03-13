@@ -13,14 +13,14 @@ const openMeteoModels = [
 /* Class storing wind speed and direction at a specific altitude. */
 class WindAtAltitude {
     /**
-     * The altitude (in feet) where this wind is located.
+     * The altitude (feet) where this wind is located.
      * @private
      * @type {number}
      */
     #altitude = 0;
 
     /**
-     * The speed of the wind (in MPH).
+     * The speed (knots) of the wind.
      * @private
      * @type {number}
      */
@@ -52,7 +52,7 @@ class WindAtAltitude {
     }
 
     /**
-     * Get the altitude where the described wind is located.
+     * Get the altitude (feet) where the described wind is located.
      * @type {number}
      */
     get altitude() {
@@ -60,7 +60,7 @@ class WindAtAltitude {
     }
 
     /**
-     * Get the wind's speed at this altitude.
+     * Get the wind's speed (knots) at this altitude.
      * @type {number}
      */
     get windSpeed() {
@@ -68,11 +68,19 @@ class WindAtAltitude {
     }
 
     /**
-     * Get the wind's direction at this altitude.
+     * Get the wind's direction (degrees from 0 North) at this altitude.
      * @type {number}
      */
     get windDirection() {
         return this.#windDirection;
+    }
+
+    /**
+     * Get the winds's speed (MPH) at this altitude.
+     * @type {number}
+     */
+    getWindSpeedMph() {
+        return this.#windSpeed * 1.15078;
     }
 }
 
@@ -105,6 +113,12 @@ class WindModelForecastData {
      * @type {number}
      */
     #groundWindDirection = 0;
+
+    /**
+     * Hour of the day this forecast was calculated for.
+     * @type {string}
+     */
+    #time = '';
     
     /**
      * Constructor initializes members to default values.
@@ -114,6 +128,7 @@ class WindModelForecastData {
         this.#windData = [];
         this.#groundWindSpeed = 0;
         this.#groundWindDirection = 0;
+        this.#time = '';
     }
 
     /**
@@ -176,17 +191,19 @@ class WindModelForecastData {
      * @param {string} modelName - Identifying name for the weather forecast model used to calulate the associated winds.
      * @param {number} groundSpeed - Speed (knots) the wind is blowing at ground level. 
      * @param {number} groundDirection - Direction (degrees from 0 north) the wind is blowing at ground level.
+     * @param {string} time - The hour of the day for which the provided weather forecast was calculated.
      * @param {Array.<WindAtAltitude>} windArray - List of wind data at ascending altitudes.
      */
-    loadOpenMeteoData(modelName, groundSpeed, groundDirection, windArray) {
+    loadOpenMeteoData(modelName, groundSpeed, groundDirection, time, windArray) {
         this.#model = modelName;
         this.#groundWindSpeed = groundSpeed;
         this.#groundWindDirection = groundDirection;
+        this.#time = time;
         this.#windData = windArray;
     }
 
     /**
-     * Get the latitude component of this location's coordinates.
+     * Get the weather forecast model's name used to generate this object's wind data.
      * @type {string}
      */
     get model() { return this.#model; }
@@ -208,6 +225,48 @@ class WindModelForecastData {
      * @type {number}
      */
     get groundWindDirection() { return this.#groundWindDirection; }
+
+    /**
+     * The hour of the day (local time zone) this forecast was created to represent.
+     * @type {string}
+     */
+    get time() { return this.#time; }
+
+    /**
+     * Provide the wind speed (knots) at the desired altitude
+     * @param {number} altitude - Altitude (feet AGL) at which a wind speed is desired.
+     * @returns {Object} { speed: {number}, direction: {number} }
+     */
+    getWindAtAltitude(altitude) {
+        // Check for values outside of our available wind 
+        if (altitude < 0) {
+            return { speed: this.#windData[0].windSpeed, bearing: this.#windData[0].windDirection };
+        } else if (altitude > this.#windData[this.#windData.length - 1].altitude) {
+            return { speed: this.#windData[this.#windData.length - 1].windSpeed, bearing: this.#windData[this.#windData.length - 1].windDirection };
+        }
+
+        // Identify the altitude range the rocket's apogee fits within
+        let windIndex = 1;
+        for (; windIndex < this.#windData.length; ++windIndex) {
+            if (this.#windData[windIndex].altitude >= altitude) {
+                break;
+            }
+        }
+
+        if (this.#windData.length == windIndex) {
+            console.debug(`Failed to find a match for altitude ${altitude} within the ${windIndex} forecast entries.`);
+            return { speed: 0, bearing: 0 };
+        }
+
+        // All following logic assumes our index refers to the current wind band's floor
+        --windIndex;
+
+        // Start with apogee
+        let windBandPercentage = getWindBandPercentage(altitude, this.#windData, windIndex);
+        let windSpeed = getAverageWindSpeed(windBandPercentage, this.#windData, windIndex);
+        let windDirection = getAverageWindDirection(windBandPercentage, this.#windData, windIndex);
+        return { speed: windSpeed, bearing: windDirection };
+    }
 }
 
 /** Class storing wind data at all available altitudes from multiple forecast models. */
@@ -451,6 +510,7 @@ async function getOpenMeteoWindPredictionData(launchLocation, launchTimes) {
                         console.log(`Hour count ${hourCount} is different from wind times count ${windJSON.hourly.time.length}.`);
                     }
                 }
+                const hourList = launchTimes.getLaunchTimesList();
             
                 let groundElevation = 0;
                 if ('elevation' in windJSON) {
@@ -570,7 +630,7 @@ async function getOpenMeteoWindPredictionData(launchLocation, launchTimes) {
                             windList.push(presWind);
                         }
 
-                        hourForecast.loadOpenMeteoData(modelNames.human, groundWindSpeed, groundWindDirection, windList);
+                        hourForecast.loadOpenMeteoData(modelNames.human, groundWindSpeed, groundWindDirection, hourList[hourIndex], windList);
                         windForecastList.push(hourForecast);
                     }
 

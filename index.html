@@ -32,10 +32,10 @@
                         <legend>Launch Site</legend>
                         <div class="data-input-grid-container">
                             <label for="launch_site_latitude" class="location-label">Latitude</label>
-                            <input type="text" name="launch_site_latitude" id="launch_site_latitude" value="30.614766" placeholder="Ex: 30.614631"/>
+                            <input type="text" name="launch_site_latitude" id="launch_site_latitude" placeholder="Ex: 30.614631"/>
 
                             <label for="launch_site_longitude" class="location-label">Longitude</label>
-                            <input type="text" name="launch_site_longitude" id="launch_site_longitude" value="-97.496783" placeholder="Ex: -97.495914"/>
+                            <input type="text" name="launch_site_longitude" id="launch_site_longitude" placeholder="Ex: -97.495914"/>
                         </div>
                     </fieldset>
                     <fieldset id="fieldset-times" class="detail-fieldset">
@@ -114,7 +114,7 @@
                             <select name="kml-shape-fill-select" id="kml-shape-fill-select" class="kml-option-select">
                                 <option value="kml-shape-fill-solid">Solid</option>
                                 <option value="kml-shape-fill-transparent">Transparent</option>
-                                <option value="kml-shape-fill-none">None</option>
+                                <option value="kml-shape-fill-none" selected>None</option>
                             </select>
 
                             <label for="kml-path-select" class="recovery_label">Paths</label>
@@ -129,7 +129,7 @@
                             <select name="kml-marker-select" id="kml-marker-select" class="kml-option-select">
                                 <option value="kml-marker-none">None</option>
                                 <option value="kml-marker-time">Times</option>
-                                <option value="kml-marker-no-label">No Labels</option>
+                                <option value="kml-marker-no-label" selected>No Labels</option>
                             </select>
                         </div>
                     </fieldset>
@@ -151,6 +151,8 @@
                 <option value="weather-speed-knots">Knots</option>
                 <option value="weather-speed-mps">Meters Per Second</option>
             </select>
+        </div>
+        <div id="wind-altitude-display">
         </div>
         <script type="module" src="main.js"></script>
     </body>
