@@ -1,6 +1,6 @@
 import { GeoLocation, GeoLocationCluster, feetToMeters } from "./geo.js";
 import { AltitudeDriftResult } from './drift_simulation.js';
-import { LaunchPathPoint } from "./launch.js";
+import { LaunchPathPoint, LaunchSimulationData } from "./launch.js";
 
 // ff / 2 = af
 // ff / 3 = 55
@@ -127,7 +127,7 @@ function createKmlLaunchPath(kmlDoc, launchPath, clampToGround) {
  * @param {GeoLocation} coordinate - The coordinates where this label should be placed
  * @returns {Element}
  */
-function createKmlLabel(kmlDoc, name, coordinate) {
+function createKmlLabel(kmlDoc, name, coordinate, agl = 0) {
     const labelElem = kmlDoc.createElement('Placemark');
     labelElem.setAttribute('xsi:type', 'KmlLabel');
 
@@ -145,11 +145,11 @@ function createKmlLabel(kmlDoc, name, coordinate) {
 
     const pointElem = kmlDoc.createElement('Point');
     const altModeElem = kmlDoc.createElement('altitudeMode');
-    altModeElem.innerHTML = 'clampToGround';
+    altModeElem.innerHTML = (0 === agl) ? 'clampToGround' : 'relativeToGround';
     pointElem.appendChild(altModeElem);
 
     const coordElem = kmlDoc.createElement('coordinates');
-    coordElem.innerHTML = `${coordinate.longitude},${coordinate.latitude},0`;
+    coordElem.innerHTML = `${coordinate.longitude},${coordinate.latitude},${agl}`;
     pointElem.appendChild(coordElem);
     labelElem.appendChild(pointElem);
 
@@ -376,7 +376,7 @@ function createAltitudeDriftDocument(altitudeDriftResults, pathType, shapeType, 
                 // Draw flight paths as opaque since they do not directly overlap with landing zones
                 documentElem.appendChild(createKmlLine(kmlDoc,
                     `${altDriftResult.apogee()}_${simData.getLaunchTime()}`,
-                    `af${kmlShapeColors[kmlColorIndex]}`,
+                    `07${kmlShapeColors[kmlColorIndex]}`,
                     false,
                     simData.launchPath));
             });
@@ -431,6 +431,10 @@ function createAltitudeDriftDocument(altitudeDriftResults, pathType, shapeType, 
 
         // Display a text only label at the shape's center
         documentElem.appendChild(createKmlLabel(kmlDoc, clusterName, landingCluster.centerLocation()));
+
+        // // Display a text only label at the flight path's apogee
+        // const lSimData = altDriftResult.simList()[0];
+        // documentElem.appendChild(createKmlLabel(kmlDoc, clusterName, lSimData.getApogeeLocation(), feetToMeters(lSimData.getApogee())));
 
         // Move to the next color wrapping back to the beginning if neccessary
         if (++kmlColorIndex >= kmlShapeColors.length) {

@@ -47,7 +47,8 @@ h1 {
     margin: 0 auto;
     overflow: hidden;
     transition: all 4s;
-    /* outline: 1px dashed blue; */
+    border-radius: 0.5rem;
+    border: 1px solid lightgray;
 }
 
 #detail-card-container {
@@ -253,6 +254,183 @@ caption {
     color: white;
 }
 
+#wind-altitude-display {
+    display: block;
+    place-items: center;
+    max-width: 90%;
+    height: fit-content;
+    overflow-x: auto;
+    margin: 0 auto;
+}
+
+#wind-altitude-table {
+    margin: 0 auto;
+}
+
+.wind-barb-cell {
+    padding: 0;
+    vertical-align: middle;
+}
+
+.wind-barb-container {
+    display: grid;
+    place-items: center;
+    height: 2em;
+    width: 2em;
+    margin: 0 auto;
+    overflow: hidden;
+}
+
+.wind-barb {
+    height: 90%;
+    width: 90%;
+}
+
+#wind-barb-draw-test {
+    height: 4em;
+    width: 4em;
+}
+
+.wind-barb-10 {
+    transform: rotate(10deg);
+}
+
+.wind-barb-20 {
+    transform: rotate(20deg);
+}
+
+.wind-barb-30 {
+    transform: rotate(30deg);
+}
+
+.wind-barb-40 {
+    transform: rotate(40deg);
+}
+
+.wind-barb-50 {
+    transform: rotate(50deg);
+}
+
+.wind-barb-60 {
+    transform: rotate(60deg);
+}
+
+.wind-barb-70 {
+    transform: rotate(70deg);
+}
+
+.wind-barb-80 {
+    transform: rotate(80deg);
+}
+
+.wind-barb-90 {
+    transform: rotate(90deg);
+}
+
+.wind-barb-100 {
+    transform: rotate(100deg);
+}
+
+.wind-barb-110 {
+    transform: rotate(110deg);
+}
+
+.wind-barb-120 {
+    transform: rotate(120deg);
+}
+
+.wind-barb-130 {
+    transform: rotate(130deg);
+}
+
+.wind-barb-140 {
+    transform: rotate(140deg);
+}
+
+.wind-barb-150 {
+    transform: rotate(150deg);
+}
+
+.wind-barb-160 {
+    transform: rotate(160deg);
+}
+
+.wind-barb-170 {
+    transform: rotate(170deg);
+}
+
+.wind-barb-180 {
+    transform: rotate(180deg);
+}
+
+.wind-barb-190 {
+    transform: rotate(190deg);
+}
+
+.wind-barb-200 {
+    transform: rotate(200deg);
+}
+
+.wind-barb-210 {
+    transform: rotate(210deg);
+}
+
+.wind-barb-220 {
+    transform: rotate(220deg);
+}
+
+.wind-barb-230 {
+    transform: rotate(230deg);
+}
+
+.wind-barb-240 {
+    transform: rotate(240deg);
+}
+
+.wind-barb-250 {
+    transform: rotate(250deg);
+}
+
+.wind-barb-260 {
+    transform: rotate(260deg);
+}
+
+.wind-barb-270 {
+    transform: rotate(270deg);
+}
+
+.wind-barb-280 {
+    transform: rotate(280deg);
+}
+
+.wind-barb-290 {
+    transform: rotate(290deg);
+}
+
+.wind-barb-300 {
+    transform: rotate(300deg);
+}
+
+.wind-barb-310 {
+    transform: rotate(310deg);
+}
+
+.wind-barb-320 {
+    transform: rotate(320deg);
+}
+
+.wind-barb-330 {
+    transform: rotate(330deg);
+}
+
+.wind-barb-340 {
+    transform: rotate(340deg);
+}
+
+.wind-barb-350 {
+    transform: rotate(350deg);
+}
+/*
 @media (width < 560px) {
     #data-entry-section {
         flex-direction: column;
@@ -291,3 +469,4 @@ caption {
         grid-template-columns: 1fr 1fr 1fr;
     }
 }
+*/

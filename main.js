@@ -27,13 +27,17 @@ const mainDescentRateElement = document.getElementById('decent_rate_main');
 const mainEventAltitudeElement = document.getElementById('main_event_altitude');
 const drogueDecentRateElement = document.getElementById('decent_rate_drogue');
 
-// Launch site buttons
+// Launch altitude input elements
 const launchAltitudeMaxElement = document.getElementById('altitude-max');
 const launchAltitudeStepElement = document.getElementById('altitude-step');
 
 // Weather option elements
 const weatherModelSelect = document.getElementById('weather-model-select');
 const weatherSpeedSelect = document.getElementById('weather-speed-select');
+const weatherModelBestMatch = 'best_match';
+const weatherModelEcmwf = 'ecmwf_ifs025';
+const weatherModelGfs = 'gfs_seamless';
+const weatherModelIcon = 'icon_seamless';
 
 // KML shape drawing option elements
 const kmlShapeSelect = document.getElementById('kml-shape-select');
@@ -50,6 +54,8 @@ const calculateDriftButton = document.getElementById('btn-calculate-drift');
 
 // Drift result display elements
 const statusDisplayElement = document.getElementById('status-display');
+const windAltitudeDisplayElement = document.getElementById('wind-altitude-display');
+const windAltitudeDisplayTableId = 'wind-altitude-table';
 
 /**
  * Store all wind data from various weather forecast models obtained from Open-Meteo
@@ -79,6 +85,12 @@ let launchLocationDetails = null;
  * @type {LaunchTimeData}
  */
 let launchTimes = null;
+
+/**
+ * List of altitudes (feet AGL) from which drift simulations will be performed.
+ * @type {Array.<number>}
+ */
+let launchAltitudeBands = null;
 
 /**
  * Update the value stored and displayed in the launch end time field.
@@ -130,12 +142,232 @@ function updateStatusDisplay(statusMessage) {
 }
 
 /**
+ * Determine the barb SVG file name to represent the provided wind speed.
+ * @param {number} windSpeed - Speed (knots) of the wind
+ * @returns {string} Pathless name of a barb SVG
+ */
+function getWindBarbSvgName(windSpeed) {
+    // Determine which barb image should be displayed.
+    const filteredSpeed = Math.round(Math.abs(windSpeed));
+
+    let barbSpeed = 5 * Math.floor(filteredSpeed / 5);
+    if ((filteredSpeed % 5) > 2) {
+        barbSpeed += 5;
+    }
+    if (barbSpeed > 145) {
+        // The largest available barb image is for 145 knots, so just clamp it for now.
+        barbSpeed = 145;
+    }
+    return `wind-barb-${barbSpeed}.svg`;
+}
+
+/**
+ * Determines the best CSS class name for a barb image representing the provided wind bearing.
+ * @param {number} windBearing - Degrees from zero North
+ * @returns {string} CSS class name which best matches the provided wind bearing
+ */
+function getWindBearingClass(windBearing) {
+    // Wind barb standard calls for 36 possible bearing directions, or every 10°.
+    // Divide by 10 so rounding will provide the expected class identifyer.
+    // Example: 114° / 10 = 11.4 which rounds to 11, so re-multiplying by 10 gets us 110.
+    //          227° / 10 = 22.7 with rounds to 23, so re-multiplying by 10 gets us 230.
+    let barbBearing = 10 * Math.round(windBearing / 10);
+
+    // Check for edge cases just to be safe.
+    if (barbBearing > 359 || barbBearing < 0) {
+        barbBearing = 0;
+    }
+    return `wind-barb-${barbBearing}`;
+}
+
+/**
+ * Creates a table for display of drifting calucation results if one does not exist.
+ * If one does exist, it clears all previous contents before adding the latest data.
+ */
+function updateWindAtAltitudeDisplay() {
+    // Remove any existing table since a new one is about to be created.
+    const existingTable = document.getElementById(windAltitudeDisplayTableId);
+    if (null != existingTable) {
+        windAltitudeDisplayElement.removeChild(existingTable);
+    }
+    
+    if (null == windModelForecasts || null == launchTimes) {
+        // Nothing to do without valid data to process.
+        return;
+    }
+    
+    // First step is of course to create the table itself.
+    const windAltTable = document.createElement('table');
+    windAltTable.setAttribute('id', windAltitudeDisplayTableId);
+
+    // Next step is creating a header for the table starting with Time.
+    const windAltTableHeader = document.createElement('thead');
+    const windAltTableHeaderRow = document.createElement('tr');
+    const windAltTableHeaderTime = document.createElement('th');
+    windAltTableHeaderTime.innerHTML = 'Time';
+    windAltTableHeaderRow.appendChild(windAltTableHeaderTime);
+
+    // Column indicating which weather model's wind is being displayed.
+    const windAltTableHeaderModel = document.createElement('th');
+    windAltTableHeaderModel.innerHTML = 'Model';
+    windAltTableHeaderRow.appendChild(windAltTableHeaderModel);
+
+    // Ground Level covers 2 columns for speed and direction displays.
+    const windAltTableHeaderGroundLevel = document.createElement('th');
+    windAltTableHeaderGroundLevel.setAttribute('colspan', '2');
+    windAltTableHeaderGroundLevel.innerHTML = 'Ground Level';
+    windAltTableHeaderRow.appendChild(windAltTableHeaderGroundLevel);
+
+    if (null != launchAltitudeBands) {
+        launchAltitudeBands.forEach((altBand) => {
+            const altBandHeader = document.createElement('th');
+
+            // Ensure the value is an integer for simplest display.
+            const altBandInt = Math.floor(altBand);
+
+            // Insert commas if the text version will be over four characters.
+            //const altBandText = (altBandInt >= 10000) ? `${Math.floor(altBandInt / 1000)},${Math.floor(altBandInt % 1000)}` : `${altBandInt}`;
+            const altBandText = `${Math.floor(altBandInt / 1000)}`;
+            //console.log(`Alt band ${altBand}, floor ${altBandInt}, text ${altBandText}`);
+
+            //altBandHeader.innerHTML = `${altBandText} ft`;
+            altBandHeader.innerHTML = `${altBandText}k ft`;
+            windAltTableHeaderRow.appendChild(altBandHeader);
+        });
+    }
+
+    windAltTableHeader.appendChild(windAltTableHeaderRow);
+    windAltTable.appendChild(windAltTableHeader);
+
+    // Now move on to displaying useful data in the body.
+    const windAltTableBody = document.createElement('tbody');
+
+    // Check which weather model the user would like to use for this drift simulation
+    let weatherModelName = weatherModelBestMatch;
+    switch (weatherModelSelect.value) {
+        case 'weather-model-ecmwf': { weatherModelName = weatherModelEcmwf; break; }
+        case 'weather-model-noaa': { weatherModelName = weatherModelGfs; break; }
+        case 'weather-model-icon': { weatherModelName = weatherModelIcon; break; }
+    }
+
+    const windModelForecast = windModelForecasts.getWindModelForecast(weatherModelName);
+
+    windModelForecast.forEach((windForecast) => {
+        // Create a new row for this hour's wind values.
+        const row = document.createElement('tr');
+
+        // The time associated with this row's wind data.
+        const timeCell = document.createElement('td');
+        timeCell.innerHTML = windForecast.time;
+        row.appendChild(timeCell);
+
+        // Wind forecast model.
+        const forecastModelCell = document.createElement('td');
+        forecastModelCell.innerHTML = windForecast.model;
+        row.appendChild(forecastModelCell);
+
+        // Wind speed at ground level converted to MPH.
+        const groundWindSpeedMph = Math.round(Math.abs(windForecast.groundWindSpeed * 1.15078));
+        const windSpeedCell = document.createElement('td');
+
+        // Indicate level of safety by transitioning background color from green to yellow to red.
+        switch (groundWindSpeedMph) {
+            case 0:
+            case 1:
+            case 2:
+                windSpeedCell.style.background = '#32CD32';
+                break;
+            case 3:
+            case 4:
+                windSpeedCell.style.background = '#00FF00';
+                break;
+            case 5:
+            case 6:
+                windSpeedCell.style.background = '#40ff00';
+                break;
+            case 7:
+            case 8:
+                windSpeedCell.style.background = '#80ff00';
+                break;
+            case 9:
+            case 10:
+                windSpeedCell.style.background = '#bfff00';
+                break;
+            case 11:
+            case 12:
+                windSpeedCell.style.background = '#ffff00';
+                break;
+            case 13:
+            case 14:
+                windSpeedCell.style.background = '#ffbf00';
+                break;
+            case 15:
+            case 16:
+                windSpeedCell.style.background = '#ff8000';
+                break;
+            case 17:
+            case 18:
+            case 19:
+                windSpeedCell.style.background = '#ff4000';
+                break;
+            default:
+                windSpeedCell.style.background = '#ff0000';
+                break;
+        }
+        windSpeedCell.appendChild(document.createTextNode(`${groundWindSpeedMph} MPH`));
+        row.appendChild(windSpeedCell);
+
+        // Average wind direction at ground level.
+        const windDirectionCell = document.createElement('td');
+        windDirectionCell.classList.add('wind-barb-cell');
+
+        const windBarbContainer = document.createElement('div');
+        windBarbContainer.classList.add('wind-barb-container');
+
+        const windBarbImage = document.createElement('img');
+        windBarbImage.setAttribute('src', `./images/wind-barbs/${getWindBarbSvgName(windForecast.groundWindSpeed)}`);
+        windBarbImage.classList.add(getWindBearingClass(windForecast.groundWindDirection));
+        windBarbImage.classList.add('wind-barb');
+
+        windBarbContainer.appendChild(windBarbImage);
+        windDirectionCell.appendChild(windBarbContainer);
+        row.appendChild(windDirectionCell);
+
+        if (null != launchAltitudeBands) {
+            launchAltitudeBands.forEach((altBand) => {
+                const altitudeBarbCell = document.createElement('td');
+                altitudeBarbCell.classList.add('wind-barb-cell');
+
+                const altitudeBarbContainer = document.createElement('div');
+                altitudeBarbContainer.classList.add('wind-barb-container');
+
+                const altitudeBarbImage = document.createElement('img');
+                const windAtAlt = windForecast.getWindAtAltitude(altBand);
+                altitudeBarbImage.setAttribute('src', `./images/wind-barbs/${getWindBarbSvgName(windAtAlt.speed)}`);
+                altitudeBarbImage.classList.add(getWindBearingClass(windAtAlt.bearing));
+                altitudeBarbImage.classList.add('wind-barb');
+
+                altitudeBarbContainer.appendChild(altitudeBarbImage);
+                altitudeBarbCell.appendChild(altitudeBarbContainer);
+                row.appendChild(altitudeBarbCell);
+            });
+        }
+
+        windAltTableBody.appendChild(row);
+    });
+
+    // Place our new body full of drift result data into the table.
+    windAltTable.appendChild(windAltTableBody);
+    windAltitudeDisplayElement.appendChild(windAltTable);
+}
+
+/**
  * Fired when the whole page has loaded, including all dependent resources except
  * those that are loaded lazily.
  */
 window.onload = () => {
     // Print a version into the log to help keep track between iterations.
-    console.log('GPS DriftCast - RSO Edition 0.3');
+    console.log('GPS DriftCast - RSO Edition 0.4');
 
     const currentDate = new Date();
 
@@ -237,21 +469,28 @@ window.onload = () => {
         );
     });
 
-    eventNextButton.addEventListener('click', () => {
-        processEventDetails();
-    });
+    weatherModelSelect.addEventListener('change', () => { updateWindAtAltitudeDisplay(); });
+
+    eventNextButton.addEventListener('click', () => { processEventDetails(); });
 
     driftPreviousButton.addEventListener('click', () => {
+        windModelForecasts = null;
+        launchTimes = null;
+        updateWindAtAltitudeDisplay();
+
         detailCardContainer.classList.remove(driftDetailCardClass);
         detailCardContainer.classList.add(eventDetailCardClass);
     });
 
-    driftNextButton.addEventListener('click', () => {
-        detailCardContainer.classList.remove(driftDetailCardClass);
-        detailCardContainer.classList.add(drawDetailCardClass);
-    });
+    driftNextButton.addEventListener('click', () => { processLaunchAltitudeBands(); });
 
     drawPreviousButton.addEventListener('click', () => {
+        // Clear the existing list of altitude bands.
+        launchAltitudeBands = null;
+
+        // Update the winds at altitude display to reflect no altitude bands are currently defined.
+        updateWindAtAltitudeDisplay();
+
         detailCardContainer.classList.remove(drawDetailCardClass);
         detailCardContainer.classList.add(driftDetailCardClass);
     });
@@ -360,6 +599,48 @@ async function processEventDetails() {
     // Everything worked as expected.  Allow the user to request drift simulation results.
     updateStatusDisplay('Wind forecast is ready.');
     calculateDriftButton.disabled = false;
+
+    updateWindAtAltitudeDisplay();
+}
+
+/** Utilize the user provided values to produce the launch's altitude bands. */
+async function processLaunchAltitudeBands() {
+    const launchAltMax = Math.abs(parseInt(launchAltitudeMaxElement.value.replaceAll(',', '')));
+    if (isNaN(launchAltMax) || launchAltMax <= 0 || launchAltMax > 101000) {
+        updateStatusDisplay(`Unable to calculate drift distance with an invalid maximum launch altitude: ${launchAltMax}`);
+        return;
+    }
+
+    const launchAltStep = Math.abs(parseInt(launchAltitudeStepElement.value.replaceAll(',', '')));
+    if (isNaN(launchAltStep)) {
+        updateStatusDisplay(`Unable to calculate drift distance with an invalid launch altitude step: ${launchAltStep}`);
+        return;
+    }
+
+    // Now a list of altitude bands can be calculated
+    launchAltitudeBands = [];
+
+    if (launchAltStep <= 0 || launchAltStep >= launchAltMax) {
+        // Skip lower altitudes using just the maximum in this case
+        launchAltitudeBands.push(launchAltMax);
+    } else {
+        let currentAltitude = launchAltStep;
+
+        // Iterate increasing altitude by the step distance each loop
+        while (currentAltitude < launchAltMax) {
+            launchAltitudeBands.push(currentAltitude);
+            currentAltitude += launchAltStep;
+        }
+
+        // Include the specified maximum altitude as the final entry
+        launchAltitudeBands.push(launchAltMax);
+    }
+
+    updateWindAtAltitudeDisplay();
+
+    // Everything look okay. Transition to the next detail card.
+    detailCardContainer.classList.remove(driftDetailCardClass);
+    detailCardContainer.classList.add(drawDetailCardClass);
 }
 
 /**
@@ -400,38 +681,6 @@ async function calculateDriftResults() {
         return;
     }
 
-    // Read in the values needed to produce the launch's altitude bands
-    const launchAltMax = Math.abs(parseInt(launchAltitudeMaxElement.value.replaceAll(',', '')));
-    if (isNaN(launchAltMax) || launchAltMax <= 0 || launchAltMax > 101000) {
-        updateStatusDisplay(`Unable to calculate drift distance with an invalid maximum launch altitude: ${launchAltMax}`);
-        return;
-    }
-
-    const launchAltStep = Math.abs(parseInt(launchAltitudeStepElement.value.replaceAll(',', '')));
-    if (isNaN(launchAltStep)) {
-        updateStatusDisplay(`Unable to calculate drift distance with an invalid launch altitude step: ${launchAltStep}`);
-        return;
-    }
-
-    // Now a list of altitude bands can be calculated
-    const altitudeBands = [];
-
-    if (launchAltStep <= 0 || launchAltStep >= launchAltMax) {
-        // Skip lower altitudes using just the maximum in this case
-        altitudeBands.push(launchAltMax);
-    } else {
-        let currentAltitude = launchAltStep;
-
-        // Iterate increasing altitude by the step distance each loop
-        while (currentAltitude < launchAltMax) {
-            altitudeBands.push(currentAltitude);
-            currentAltitude += launchAltStep;
-        }
-
-        // Include the specified maximum altitude as the final entry
-        altitudeBands.push(launchAltMax);
-    }
-
     // Check which weather model the user would like to use for this drift simulation
     let weatherModelName = 'best_match';
     switch (weatherModelSelect.value) {
@@ -443,12 +692,13 @@ async function calculateDriftResults() {
     // Clear out any previous drift results from previous simulations
     altitudeDriftResults = [];
 
-    altitudeBands.forEach((currentAltitude) => {
+    launchAltitudeBands.forEach((currentAltitude) => {
         const simulationList = [];
 
         // Create a rocket with an apogee of the current altitude
         let rocketDetails = new RocketApogee(currentAltitude);
         rocketDetails.setDualDeployment(drogueDecentRate, mainDeployAltitude, mainDescentRate);
+        //rocketDetails.setSingleDeployment(mainDescentRate);
 
         let forecastHour = new Date(launchTimes.launchDate);
 
@@ -517,7 +767,7 @@ async function calculateDriftResults() {
         xmlStrings.push(serializer.serializeToString(kmlDoc));
 
         const kmlBlob = new Blob(xmlStrings, { type: "application/vnd.google-earth.kml+xml", });
-        saveKmlFile(kmlBlob);
+        saveKmlFile(kmlBlob, 'RSO_Drift.kml');
     } else {
         // Let the user know something bad happened.
         updateStatusDisplay('An error occurred.');
