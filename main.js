@@ -369,48 +369,62 @@ window.onload = () => {
     // Print a version into the log to help keep track between iterations.
     console.log('GPS DriftCast - RSO Edition 0.4');
 
-    const currentDate = new Date();
+    let launchDate = new Date();
+    let launchStartHour = launchDate.getHours();
+
+    // Defaulting to 4pm due to personal bias
+    let launchEndHour = 16;
+
+    // Use Saturday as initial value if the current day is earlier in the week
+    const launchDay = launchDate.getDay();
+    if (launchDay < 6) {
+        launchDate.setTime(launchDate.getTime() + ((6 - launchDay) * secondsInDay));
+
+        // Set the start time based on typical launch hours
+        launchStartHour = 9;
+    } else if (launchStartHour < 16) {
+        // Today is a Saturday, so just update the start and end times
+        if (launchStartHour > 9) {
+            --launchStartHour;
+        } else {
+            launchStartHour = 9;
+        }
+    } else if (launchStartHour < 23) {
+        launchEndHour = launchStartHour + 1;
+    } else {
+        // It appears start and end times will span across days, so skip ahead to the following Saturday
+        launchDate.setTime(launchDate.getTime() + (7 * secondsInDay));
+        launchStartHour = 9;
+    }
 
     // Add leading zeros if the numbers are single digit
     let monthString;
-    if (currentDate.getMonth() < 9) {
-        monthString = '0' + (currentDate.getMonth() + 1).toString();
+    if (launchDate.getMonth() < 9) {
+        monthString = '0' + (launchDate.getMonth() + 1).toString();
     } else {
-        monthString = (currentDate.getMonth() + 1).toString();
+        monthString = (launchDate.getMonth() + 1).toString();
     }
 
     let dayString;
-    if (currentDate.getDate() < 10) {
-        dayString = '0' + currentDate.getDate().toString();
+    if (launchDate.getDate() < 10) {
+        dayString = '0' + launchDate.getDate().toString();
     } else {
-        dayString = currentDate.getDate().toString();
+        dayString = launchDate.getDate().toString();
     }
 
-    // Initialize the date element to today
-    launchDateElement.value = `${currentDate.getFullYear()}-${monthString}-${dayString}`;
+    // Initialize the date and time elements
+    launchDateElement.value = `${launchDate.getFullYear()}-${monthString}-${dayString}`;
 
-    // Prevent the user from selecting a date too far in the past
-    let oldestDate = new Date();
-    oldestDate.setTime(oldestDate.getTime() - (maxDaysPreviousOpenMeteo * secondsInDay));
+    let timeText = launchStartHour < 10 ? `0${launchStartHour}` : launchStartHour.toString();
+    startTimeElement.value = timeText + ':00';
 
-    launchDateElement.min = `${oldestDate.getFullYear()}-${(oldestDate.getMonth() + 1).toString().padStart(2, '0')}-${oldestDate.getDate().toString().padStart(2, '0')}`;
+    timeText = launchEndHour < 10 ? `0${launchEndHour}` : launchEndHour.toString();
+    endTimeElement.value = timeText + ':00';
 
     // Prevent the user from selecting a date too far into the future
     const maxDate = new Date();
     maxDate.setTime(maxDate.getTime() + (maxDaysFutureOpenMeteo * secondsInDay));
-
     launchDateElement.max = `${maxDate.getFullYear()}-${(maxDate.getMonth() + 1).toString().padStart(2, '0')}-${maxDate.getDate().toString().padStart(2, '0')}`;
-
-    // Initialize the time elements to the current hour plus a max offset
-    const currentHour = currentDate.getHours();
-    if (currentHour < 10) {
-        startTimeElement.value = `0${currentHour}:00`;
-    } else {
-        startTimeElement.value = `${currentHour}:00`;
-    }
-
-    // Initialize the end time for six hours after the start time
-    setEndTimeValue(currentHour + 6);
 
     // Ensure the launch date is within the range for which wind forecasts are available
     launchDateElement.addEventListener('change', (event) => {
@@ -425,8 +439,8 @@ window.onload = () => {
         today = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
         let deltaDays = (launchDay - today) / secondsInDay;
-        if (deltaDays < (-1 * maxDaysPreviousOpenMeteo)) {
-            console.debug('Too far in the past.');
+        if (numYear < 2022) {
+            console.debug('Weather history before 2022 is not available.');
         } else if (deltaDays > maxDaysFutureOpenMeteo) {
             console.debug('Too far in the future.');
         }
@@ -523,10 +537,6 @@ async function processEventDetails() {
     // Verify the launch hour offsets are within our expectations
     if ((launchTimes.endHour < launchTimes.startHour) && (launchTimes.endHour > 0)) {
         updateStatusDisplay('The launch cannot end before it starts.');
-        return;
-    }
-    if (launchTimes.startHourOffset < (-24 * maxDaysPreviousOpenMeteo)) {
-        updateStatusDisplay(`Wind speeds older than ${maxDaysPreviousOpenMeteo} days are not available.`);
         return;
     }
     if (launchTimes.endHourOffset > (24 * maxDaysFutureOpenMeteo)) {
