@@ -314,11 +314,11 @@ function createKmlShape(kmlDoc, name, outlineColor, fillColor, coordinates) {
 
 /**
  * Convert the drift results into KML shape Elements inside an XMLDocument
- * @type {Array.<AltitudeDriftResult} altitudeDriftResults - List of drift results for each altitude
- * @type {DrawPathTypes} pathType - Indicates which type of simulation paths should be drawn
- * @type {DrawShapeTypes} shapeType - Indicates which type of shape around landing locations should be drawn
- * @type {ShapeFillTypes} fillType - Indicates how the landing location shapes should appear
- * @type {DrawMarkerTypes} markerType - Indicates which type of marker should be drawn
+ * @param {Array.<AltitudeDriftResult} altitudeDriftResults - List of drift results for each altitude
+ * @param {DrawPathTypes} pathType - Indicates which type of simulation paths should be drawn
+ * @param {DrawShapeTypes} shapeType - Indicates which type of shape around landing locations should be drawn
+ * @param {ShapeFillTypes} fillType - Indicates how the landing location shapes should appear
+ * @param {DrawMarkerTypes} markerType - Indicates which type of marker should be drawn
  * @returns {XMLDocument}
  */
 function createAltitudeDriftDocument(altitudeDriftResults, pathType, shapeType, fillType, markerType) {
