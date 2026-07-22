@@ -391,7 +391,7 @@ class LaunchSimulationData {
 
     /**
      * Provides a text version of this launch's time including AM or PM.
-     * @returns {GeoLocation} Coordinates of the landing location if available. Otherwise null.
+     * @returns {string} Text version of this launch's time including AM or PM.
      */
     getLaunchTime() {
         if (0 == this.#time) {
