@@ -50,7 +50,7 @@ const eventNextButton = document.getElementById('btn-event-next');
 const driftPreviousButton = document.getElementById('btn-drift-prev');
 const driftNextButton = document.getElementById('btn-drift-next');
 const drawPreviousButton = document.getElementById('btn-draw-prev');
-const calculateDriftButton = document.getElementById('btn-calculate-drift');
+const saveKmlFileButton = document.getElementById('btn-save-kml-file');
 
 // Drift result display elements
 const statusDisplayElement = document.getElementById('status-display');
@@ -501,20 +501,28 @@ window.onload = () => {
     drawPreviousButton.addEventListener('click', () => {
         // Clear the existing list of altitude bands.
         launchAltitudeBands = null;
+        altitudeDriftResults = [];
 
         // Update the winds at altitude display to reflect no altitude bands are currently defined.
         updateWindAtAltitudeDisplay();
+
+        // Re-enable the Drift Detail pane's button.
+        driftNextButton.disabled = false;
 
         detailCardContainer.classList.remove(drawDetailCardClass);
         detailCardContainer.classList.add(driftDetailCardClass);
     });
 
-    calculateDriftButton.addEventListener('click', async () => {
+    saveKmlFileButton.addEventListener('click', async () => {
         // Let the user know something is happening in the background.
-        updateStatusDisplay('Calculating drift...');
+        updateStatusDisplay('Generating KML file...');
+
+        if (0 === altitudeDriftResults.length) {
+            calculateDriftResults();
+        }
 
         // Calculate new drift and landing results
-        calculateDriftResults();
+        saveDriftResultsKML();
     });
 }
 
@@ -553,7 +561,7 @@ async function processEventDetails() {
     }
 
     // Ensure the user is unable to trigger KML generation before the wind data is ready
-    calculateDriftButton.disabled = true;
+    saveKmlFileButton.disabled = true;
 
     // Transition the UI to display our Drift Details card
     detailCardContainer.classList.remove(eventDetailCardClass);
@@ -608,9 +616,10 @@ async function processEventDetails() {
 
     // Everything worked as expected.  Allow the user to request drift simulation results.
     updateStatusDisplay('Wind forecast is ready.');
-    calculateDriftButton.disabled = false;
+    saveKmlFileButton.disabled = false;
 
     updateWindAtAltitudeDisplay();
+    calculateDriftResults();
 }
 
 /** Utilize the user provided values to produce the launch's altitude bands. */
@@ -626,6 +635,9 @@ async function processLaunchAltitudeBands() {
         updateStatusDisplay(`Unable to calculate drift distance with an invalid launch altitude step: ${launchAltStep}`);
         return;
     }
+
+    // Disable the triggering button to prevent simultaneous data processing.
+    driftNextButton.disabled = true;
 
     // Now a list of altitude bands can be calculated
     launchAltitudeBands = [];
@@ -648,7 +660,7 @@ async function processLaunchAltitudeBands() {
 
     updateWindAtAltitudeDisplay();
 
-    // Everything look okay. Transition to the next detail card.
+    // Everything looks okay. Transition to the next detail card.
     detailCardContainer.classList.remove(driftDetailCardClass);
     detailCardContainer.classList.add(drawDetailCardClass);
 }
@@ -660,6 +672,14 @@ async function processLaunchAltitudeBands() {
  * Use the resulting data to generate a KML file and save it.
  */
 async function calculateDriftResults() {
+    // Unable to proceed if the weather forecast fetch is still pending.
+    if (null === windModelForecasts)
+        return;
+
+    // Unable to proceed if the weather forecast is received before launch altitudes are defined.
+    if (null === launchAltitudeBands)
+        return;
+
     // Verify the launch event location is valid
     if (null == launchLocationDetails) {
         updateStatusDisplay('Unable to calculate drift without a valid event location.');
@@ -739,47 +759,63 @@ async function calculateDriftResults() {
 
     if (altitudeDriftResults.length > 0) {
         updateStatusDisplay('Drift simulation complete.');
-
-        // Identify which KML drawing options the user selected beginning with the shape
-        let kmlShapeType = DrawShapeTypes.ELLIPSE;
-        switch (kmlShapeSelect.value) {
-            case 'kml-shape-polygon': { kmlShapeType = DrawShapeTypes.POLYGON; break; }
-            case 'kml-shape-box': { kmlShapeType = DrawShapeTypes.BOX; break; }
-            case 'kml-shape-none': { kmlShapeType = DrawShapeTypes.NONE; break; }
-        }
-
-        // Next check how the user would like the shapes to be filled
-        let kmlShapeFill = ShapeFillTypes.TRANSPARENT;
-        if ('kml-shape-fill-solid' === kmlShapeFillSelect.value) { kmlShapeFill = ShapeFillTypes.SOLID; }
-        else if ('kml-shape-fill-none' === kmlShapeFillSelect.value) { kmlShapeFill = ShapeFillTypes.NONE; }
-
-        // The final option is what type of paths to draw
-        let kmlPathType = DrawPathTypes.GROUND;
-        switch (kmlPathSelect.value) {
-            case 'kml-path-flight': { kmlPathType = DrawPathTypes.FLIGHT; break; }
-            case 'kml-path-both': { kmlPathType = DrawPathTypes.BOTH; break; }
-            case 'kml-path-none': { kmlPathType = DrawPathTypes.NONE; break; }
-        }
-
-        let kmlMarkerType = DrawMarkerTypes.NONE;
-        if ('kml-marker-time' === kmlMarkerSelect.value) {
-            kmlMarkerType = DrawMarkerTypes.TIMES;
-        } else if ('kml-marker-no-label' === kmlMarkerSelect.value) {
-            kmlMarkerType = DrawMarkerTypes.NO_LABEL;
-        }
-
-        const kmlDoc = createAltitudeDriftDocument(altitudeDriftResults, kmlPathType, kmlShapeType, kmlShapeFill, kmlMarkerType);
-
-        // DOM does not consider this line valid XML, so add it directly as a string.
-        let xmlStrings = ['<?xml version="1.0" encoding="utf-8"?>'];
-
-        const serializer = new XMLSerializer();
-        xmlStrings.push(serializer.serializeToString(kmlDoc));
-
-        const kmlBlob = new Blob(xmlStrings, { type: "application/vnd.google-earth.kml+xml", });
-        saveKmlFile(kmlBlob, 'RSO_Drift.kml');
     } else {
         // Let the user know something bad happened.
-        updateStatusDisplay('An error occurred.');
+        updateStatusDisplay('An error occurred while simulating drift.');
     }
+}
+
+/** Use the previously calculated drift simulations to generate and save a KML file. */
+async function saveDriftResultsKML() {
+    if (0 === altitudeDriftResults.length) {
+        updateStatusDisplay('Drift simulation results are not currently available.');
+        return;
+    }
+
+    // Disable the triggering button until this save process has completed.
+    saveKmlFileButton.disabled = true;
+
+    // Identify which KML drawing options the user selected beginning with the shape
+    let kmlShapeType = DrawShapeTypes.ELLIPSE;
+    switch (kmlShapeSelect.value) {
+        case 'kml-shape-polygon': { kmlShapeType = DrawShapeTypes.POLYGON; break; }
+        case 'kml-shape-box': { kmlShapeType = DrawShapeTypes.BOX; break; }
+        case 'kml-shape-none': { kmlShapeType = DrawShapeTypes.NONE; break; }
+    }
+
+    // Next check how the user would like the shapes to be filled
+    let kmlShapeFill = ShapeFillTypes.TRANSPARENT;
+    if ('kml-shape-fill-solid' === kmlShapeFillSelect.value) { kmlShapeFill = ShapeFillTypes.SOLID; }
+    else if ('kml-shape-fill-none' === kmlShapeFillSelect.value) { kmlShapeFill = ShapeFillTypes.NONE; }
+
+    // The final option is what type of paths to draw
+    let kmlPathType = DrawPathTypes.GROUND;
+    switch (kmlPathSelect.value) {
+        case 'kml-path-flight': { kmlPathType = DrawPathTypes.FLIGHT; break; }
+        case 'kml-path-both': { kmlPathType = DrawPathTypes.BOTH; break; }
+        case 'kml-path-none': { kmlPathType = DrawPathTypes.NONE; break; }
+    }
+
+    let kmlMarkerType = DrawMarkerTypes.NONE;
+    if ('kml-marker-time' === kmlMarkerSelect.value) {
+        kmlMarkerType = DrawMarkerTypes.TIMES;
+    } else if ('kml-marker-no-label' === kmlMarkerSelect.value) {
+        kmlMarkerType = DrawMarkerTypes.NO_LABEL;
+    }
+
+    const kmlDoc = createAltitudeDriftDocument(altitudeDriftResults, kmlPathType, kmlShapeType, kmlShapeFill, kmlMarkerType);
+
+    // DOM does not consider this line valid XML, so add it directly as a string.
+    let xmlStrings = ['<?xml version="1.0" encoding="utf-8"?>'];
+
+    const serializer = new XMLSerializer();
+    xmlStrings.push(serializer.serializeToString(kmlDoc));
+
+    const kmlBlob = new Blob(xmlStrings, { type: "application/vnd.google-earth.kml+xml", });
+    saveKmlFile(kmlBlob, 'RSO_Drift.kml');
+
+    // Re-enable the triggering button.
+    saveKmlFileButton.disabled = false;
+
+    updateStatusDisplay('KML file save complete.');
 }
