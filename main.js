@@ -26,6 +26,8 @@ const endTimeElement = document.getElementById('end_time');
 const mainDescentRateElement = document.getElementById('decent_rate_main');
 const mainEventAltitudeElement = document.getElementById('main_event_altitude');
 const drogueDecentRateElement = document.getElementById('decent_rate_drogue');
+const defaultLaunchStartTime = 9;
+const defaultLaunchEndTime = 16;
 
 // Launch altitude input elements
 const launchAltitudeMaxElement = document.getElementById('altitude-max');
@@ -93,20 +95,52 @@ let launchTimes = null;
 let launchAltitudeBands = null;
 
 /**
+ * Convert the proviced hour value (0-23) into a time input element compatible string.
+ * @param {number} hour - The hour value to be converted.
+ * @returns {string} String compatible with a time input element.
+ */
+function convertHourForTimeInput(hour) {
+    let convertedHour = '';
+
+    if (isNaN(hour) || hour > 23) {
+        convertedHour = '00:00';
+    } else if (hour < 10) {
+        convertedHour = `0${hour}:00`;
+    } else {
+        convertedHour = `${hour}:00`;
+    }
+
+    return convertedHour;
+}
+
+/**
+ * Update the value stored and displayed in the launch start time field.
+ * @param {number} startHour - The new start hour for the launch.
+ * @throws {TypeError} Invalid start hour value.
+ */
+function setStartTimeValue(startHour) {
+    if (null === startTimeElement)
+        return;
+
+    if (isNaN(startHour))
+        throw new TypeError(`Invalid start hour: ${startHour}.`);
+
+    startTimeElement.value = convertHourForTimeInput(startHour);
+}
+
+/**
  * Update the value stored and displayed in the launch end time field.
  * @param {number} endHour - The new end hour for the launch.
  * @throws {TypeError} Invalid end hour value.
  */
 function setEndTimeValue(endHour) {
-    if (isNaN(endHour)) throw new TypeError(`Invalid end hour: ${endHour}.`);
+    if (null === endTimeElement)
+        return;
 
-    if (endHour > 23) {
-        endTimeElement.value = '00:00';
-    } else if (endHour < 10) {
-        endTimeElement.value = `0${endHour}:00`;
-    } else {
-        endTimeElement.value = `${endHour}:00`;
-    }
+    if (isNaN(endHour))
+        throw new TypeError(`Invalid end hour: ${endHour}.`);
+
+    endTimeElement.value = convertHourForTimeInput(endHour);
 }
 
 /**
@@ -367,34 +401,34 @@ function updateWindAtAltitudeDisplay() {
  */
 window.onload = () => {
     // Print a version into the log to help keep track between iterations.
-    console.log('GPS DriftCast - RSO Edition 0.4');
+    console.log('GPS DriftCast - RSO Edition 0.5');
 
     let launchDate = new Date();
     let launchStartHour = launchDate.getHours();
 
     // Defaulting to 4pm due to personal bias
-    let launchEndHour = 16;
+    let launchEndHour = defaultLaunchEndTime;
 
     // Use Saturday as initial value if the current day is earlier in the week
     const launchDay = launchDate.getDay();
     if (launchDay < 6) {
         launchDate.setTime(launchDate.getTime() + ((6 - launchDay) * secondsInDay));
 
-        // Set the start time based on typical launch hours
-        launchStartHour = 9;
-    } else if (launchStartHour < 16) {
+    // Set the start time based on typical launch hours
+    launchStartHour = defaultLaunchStartTime;
+    } else if (launchStartHour < defaultLaunchEndTime) {
         // Today is a Saturday, so just update the start and end times
-        if (launchStartHour > 9) {
+        if (launchStartHour > defaultLaunchStartTime) {
             --launchStartHour;
         } else {
-            launchStartHour = 9;
+            launchStartHour = defaultLaunchStartTime;
         }
     } else if (launchStartHour < 23) {
         launchEndHour = launchStartHour + 1;
     } else {
         // It appears start and end times will span across days, so skip ahead to the following Saturday
         launchDate.setTime(launchDate.getTime() + (7 * secondsInDay));
-        launchStartHour = 9;
+        launchStartHour = defaultLaunchStartTime;
     }
 
     // Add leading zeros if the numbers are single digit
@@ -415,11 +449,8 @@ window.onload = () => {
     // Initialize the date and time elements
     launchDateElement.value = `${launchDate.getFullYear()}-${monthString}-${dayString}`;
 
-    let timeText = launchStartHour < 10 ? `0${launchStartHour}` : launchStartHour.toString();
-    startTimeElement.value = timeText + ':00';
-
-    timeText = launchEndHour < 10 ? `0${launchEndHour}` : launchEndHour.toString();
-    endTimeElement.value = timeText + ':00';
+    setStartTimeValue(launchStartHour);
+    setEndTimeValue(launchEndHour);
 
     // Prevent the user from selecting a date too far into the future
     const maxDate = new Date();
