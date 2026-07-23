@@ -16,6 +16,9 @@
         <link href="https://fonts.googleapis.com/css2?family=Trade+Winds&display=swap" rel="stylesheet">
 
         <link rel="stylesheet" href="styles.css" />
+
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     </head>
     <body>
         <a name="page_top"></a>
@@ -143,16 +146,10 @@
         <div>
             <h3 id="status-display" hidden>Let's get started!</h3>
         </div>
-        <div id="weather-display-wrapper" hidden>
-            <label for="weather-speed-select" class="recovery_label">Speed Units</label>
-            <select name="weather-speed-select" id="weather-speed-select" class="kml-option-select" disabled>
-                <option value="weather-speed-mph">Miles Per Hour</option>
-                <option value="weather-speed-kph">Kilometers Per Hour</option>
-                <option value="weather-speed-knots">Knots</option>
-                <option value="weather-speed-mps">Meters Per Second</option>
-            </select>
-        </div>
         <div id="wind-altitude-display"></div>
+        <div id="map-wrapper">
+            <div id="map" hidden></div>
+        </div>
         <script type="module" src="main.js"></script>
     </body>
 </html>

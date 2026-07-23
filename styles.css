@@ -69,11 +69,11 @@ h1 {
 }
 
 .detail-card-two {
-    left: -291px;
+    left: calc(0px - 1em - var(--detail-card-width));
 }
 
 .detail-card-three {
-    left: -582px;
+    left: calc(0px - 2em - var(--detail-card-width) - var(--detail-card-width));
 }
 
 fieldset {
@@ -430,6 +430,20 @@ caption {
 .wind-barb-350 {
     transform: rotate(350deg);
 }
+
+#map-wrapper {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 1rem auto;
+}
+
+#map {
+    height: 80vh;
+    width: 80vw;
+}
+
 /*
 @media (width < 560px) {
     #data-entry-section {

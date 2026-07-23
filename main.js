@@ -1,4 +1,4 @@
-import { GeoLocation } from "./geo.js";
+import { GeoLocation, GeoLocationCluster } from "./geo.js";
 import { DrawShapeTypes, ShapeFillTypes, DrawPathTypes, DrawMarkerTypes, createAltitudeDriftDocument, saveKmlFile } from "./kml.js";
 import { LaunchTimeData, LaunchLocationData } from "./launch.js";
 import { WindForecastData, getOpenMeteoWindPredictionData } from "./wind.js";
@@ -33,7 +33,6 @@ const launchAltitudeStepElement = document.getElementById('altitude-step');
 
 // Weather option elements
 const weatherModelSelect = document.getElementById('weather-model-select');
-const weatherSpeedSelect = document.getElementById('weather-speed-select');
 const weatherModelBestMatch = 'best_match';
 const weatherModelEcmwf = 'ecmwf_ifs025';
 const weatherModelGfs = 'gfs_seamless';
@@ -56,6 +55,8 @@ const saveKmlFileButton = document.getElementById('btn-save-kml-file');
 const statusDisplayElement = document.getElementById('status-display');
 const windAltitudeDisplayElement = document.getElementById('wind-altitude-display');
 const windAltitudeDisplayTableId = 'wind-altitude-table';
+
+const mapPreviewElement = document.getElementById('map');
 
 /**
  * Store all wind data from various weather forecast models obtained from Open-Meteo
@@ -91,6 +92,466 @@ let launchTimes = null;
  * @type {Array.<number>}
  */
 let launchAltitudeBands = null;
+
+/**
+ * Colors used to draw lines and shapes on the preview map.  Location icons were
+ * created with identical color values so everything is visually cohesive.
+ *                       orange    yellow     sky       lime     purple     aqua      navy     green      blue       red      grey      black     white
+ * @type {Array.<string>}
+ */
+const leafletColors = [ 'f57c00', 'ffff00', '1a93fa', '00ff00', '800080', '00ffff', '000080', '66bb6a', '0000ff', 'ff0000', 'bdbdbd', '000000', 'ffffff' ];
+
+/**
+ * Contains icon definitions with colors matching our line and shape values.
+ * @type {Array.<L.Icon>}
+ */
+const leafletIcons = [
+    new L.Icon({
+        iconUrl: 'images/markers/marker-orange.png',
+        shadowUrl: 'images/markers/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    }),
+    new L.Icon({
+        iconUrl: 'images/markers/marker-yellow.png',
+        shadowUrl: 'images/markers/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    }),
+    new L.Icon({
+        iconUrl: 'images/markers/marker-sky.png',
+        shadowUrl: 'images/markers/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    }),
+    new L.Icon({
+        iconUrl: 'images/markers/marker-lime.png',
+        shadowUrl: 'images/markers/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    }),
+    new L.Icon({
+        iconUrl: 'images/markers/marker-purple.png',
+        shadowUrl: 'images/markers/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    }),
+    new L.Icon({
+        iconUrl: 'images/markers/marker-aqua.png',
+        shadowUrl: 'images/markers/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    }),
+    new L.Icon({
+        iconUrl: 'images/markers/marker-navy.png',
+        shadowUrl: 'images/markers/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    }),
+    new L.Icon({
+        iconUrl: 'images/markers/marker-green.png',
+        shadowUrl: 'images/markers/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    }),
+    new L.Icon({
+        iconUrl: 'images/markers/marker-blue.png',
+        shadowUrl: 'images/markers/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    }),
+    new L.Icon({
+        iconUrl: 'images/markers/marker-red.png',
+        shadowUrl: 'images/markers/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    }),
+    new L.Icon({
+        iconUrl: 'images/markers/marker-grey.png',
+        shadowUrl: 'images/markers/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    }),
+    new L.Icon({
+        iconUrl: 'images/markers/marker-black.png',
+        shadowUrl: 'images/markers/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    }),
+    new L.Icon({
+        iconUrl: 'images/markers/marker-white.png',
+        shadowUrl: 'images/markers/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    })
+];
+
+let map_preview = null;
+let landingAreas = [];
+let osmLayer = null;
+let topoLayer = null;
+let imageryLayer = null;
+let baseMaps = null;
+let launchMarker = null;
+let launchMarkerLabel = null;
+
+/** Stores information used to draw drift simulation results within a Leaflet map instance. */
+class LeafletDriftResult {
+    /**
+     * Text of the time associated with this drift.
+     * @private
+     * @type {string}
+     */
+    #timeText = '';
+
+    /**
+     * Coordinates of this drift result's landing location.
+     * @private
+     * @type {GeoLocation}
+     */
+    #landingLocation = null;
+
+    /**
+     * Index into the array of available colors.
+     * @private
+     * @type {number}
+     */
+    #colorIndex = 0;
+
+    /**
+     * Leaflet tooltip indicating what time this drift occurs.
+     * @private
+     * @type {L.tooltip}
+     */
+    #timeLabel = null;
+
+    /**
+     * Leaflet marker placed at the landing location.
+     * @private
+     * @type {L.marker}
+     */
+    #marker = null;
+
+    /**
+     * Leaflet line following the travel path along the ground due to wind drift.
+     * @private
+     * @type {L.polyline}
+     */
+    #groundPath = null;
+
+    /**
+     * @param {LaunchSimulationData} simData - Contains results from the drift simulation to be represented.
+     * @param {number} colorIndex - Index into the array of available Leaflet colors.
+     */
+    constructor(simData, colorIndex) {
+        this.#colorIndex = colorIndex;
+        this.#timeText = simData.getLaunchTime();
+        this.#landingLocation = simData.getLandingLocation().getCopy();
+
+        const driftPathCoordinates = [];
+        simData.launchPath.forEach((pathPoint) => {
+            driftPathCoordinates.push([pathPoint.location.latitude, pathPoint.location.longitude]);
+        });
+
+        // The drift path will remain constant, so just create it now without adding it to the map.
+        this.#groundPath = L.polyline(driftPathCoordinates,
+            {
+                color: `#${leafletColors[colorIndex]}`,
+                opacity: 0.25,
+                weight: 1
+            });
+    }
+
+    /**
+     * Get the landing location coordinates for this drift result.
+     * @returns {GeoLocation}
+     */
+    landingLocation() {
+        return this.#landingLocation.getCopy();
+    }
+
+    /**
+     * Create a marker instance and add it to the provided map object.
+     * @param {L.map} map - Map object where the marker will be displayed.
+     * @param {boolean} showLabel - Indicates if a label containing the time should appear with this marker.
+     */
+    showMarker(map, showLabel) {
+        // Cleanup any existing assets.  Maybe try to keep them in the future to avoid thrashing memory?
+        this.hideMarker();
+
+        // Create the new marker
+        this.#marker = L.marker([this.#landingLocation.latitude, this.#landingLocation.longitude],
+            {
+                icon: leafletIcons[this.#colorIndex],
+                draggable: false
+            });
+
+        if (showLabel) {
+            // Create the new time label.
+            this.#timeLabel = L.tooltip({
+                content: this.#timeText,
+                permanent: true
+            });
+            this.#marker.bindTooltip(this.#timeLabel);
+        }
+        this.#marker.addTo(map);
+    }
+
+    /** Remove the marker and it's label from the map before destroying their assets. */
+    hideMarker() {
+        if (null !== this.#timeLabel) {
+            this.#marker.unbindTooltip();
+            this.#timeLabel = null;
+        }
+        if (null !== this.#marker) {
+            this.#marker.remove();
+            this.#marker = null;
+        }
+    }
+
+    /**
+     * Add the polyline created in our constructor to the map for display.
+     * @param {L.map} map - Map object where the marker will be displayed.
+     */
+    showPath(map) {
+        this.#groundPath.remove();
+        this.#groundPath.addTo(map);
+    }
+
+    /** Remove our polyline from the map currently displaying it. */
+    hidePath() {
+        this.#groundPath.remove();
+    }
+}
+
+/** Contains information for drawing the area surrounding a cluster of landing locations with a Leaflet map */
+class LeafletLandingArea {
+    /**
+     * Apogee from which drift was simulated to produce this landing area's cluster.
+     * @private
+     * @type {number}
+     */
+    #apogee = 0;
+
+    /**
+     * Displays the altitude associated with this landing area.
+     * @private
+     * @type {L.popup}
+     */
+    #apogeeTooltip = null;
+
+    /**
+     * Index into the array of available colors.
+     * @private
+     * @type {number}
+     */
+    #colorIndex = 0;
+
+    /**
+     * Cluster of landing locations defining this landing area.
+     * @private
+     * @type {GeoLocationCluster}
+     */
+    #landingCluster = null;
+
+    /**
+     * List of drift results defining this landing area
+     * @private
+     * @type {Array.<LeafletDriftResult>}
+     */
+    #driftResults = [];
+
+    /**
+     * Leaflet polygon representing landing area.  Actual shape depends on the user's selection.
+     * @private
+     * @type {L.polygon}
+     */
+    #landingArea = null;
+
+    /**
+     * Coordinates of the upper-left and lower-right corners of a bounding box surrounding this landing area.
+     * @private
+     * @type {Array.<Array.<number>>}
+     */
+    #bounds = [];
+
+    /**
+     * @param {AltitudeDriftResult} altDriftResult 
+     * @param {number} colorIndex - Identifies which color from our array should be used when drawing shapes.
+     */
+    constructor(altDriftResult, colorIndex) {
+        this.#apogee = altDriftResult.apogee();
+        this.#colorIndex = colorIndex;
+
+        // Intialize our corner coordinates with worst case values.
+        let upperLatitude = -90.0;
+        let lowerLatitude = 90.0;
+        let leftLongitude = 180.0;
+        let rightLongitude = -180.0;
+
+        // Iterate over each drift simulation inside this altitude band
+        altDriftResult.simList().forEach((simData) => {
+            this.#driftResults.push(new LeafletDriftResult(simData, colorIndex));
+            this.#landingCluster = new GeoLocationCluster(altDriftResult.landingLocations());
+
+            // Update our bounds with this drift simulation's path coordinates.
+            simData.launchPath.forEach((pathPoint) => {
+                if (pathPoint.location.latitude > upperLatitude)
+                    upperLatitude = pathPoint.location.latitude;
+                if (pathPoint.location.latitude < lowerLatitude)
+                    lowerLatitude = pathPoint.location.latitude;
+                if (pathPoint.location.longitude > rightLongitude)
+                    rightLongitude = pathPoint.location.longitude;
+                if (pathPoint.location.longitude < leftLongitude)
+                    leftLongitude = pathPoint.location.longitude;
+            });
+        });
+
+        this.#bounds.push([upperLatitude, leftLongitude]);
+        this.#bounds.push([lowerLatitude, rightLongitude]);
+    }
+
+    /**
+     * Creates Leaflet markers and associated text label to be displayed by the provided map object.
+     * @param {L.map} map - The map object which will display the markers.
+     * @param {booleam} showLabels - Indicates if there should be text markers attached to the markers.
+     */
+    showMarkers(map, showLabels) {
+        this.#driftResults.forEach((driftResult) => {
+            driftResult.showMarker(map, showLabels);
+        });
+    }
+
+    /** Hides all Leaflet markers currently being displayed. */
+    hideMarkers() {
+        this.#driftResults.forEach((driftResult) => {
+            driftResult.hideMarker();
+        });
+    }
+
+    /**
+     * Creates Leaflet polylines within the provided map representing drift paths associasted with this landing area.
+     * @param {L.map} map - The map object which will display the paths.
+     */
+    showPaths(map) {
+        this.#driftResults.forEach((driftResult) => {
+            driftResult.showPath(map);
+        });
+    }
+
+    /** Hides all Leaflet polylines currently being displayed. */
+    hidePaths() {
+        this.#driftResults.forEach((driftResult) => {
+            driftResult.hidePath();
+        });
+    }
+
+    /**
+     * Creates a Leaflet polygon surrounding this landing area and adds it onto the provided map object.
+     * @param {L.map} map - The Leaflet map object which will display the landing area.
+     * @param {DrawShapeTypes} shapeType - Indicates what type of polygon shape should be created.
+     * @param {ShapeFillTypes} fillType - Indicates if the polygon should be filled with color.
+     */
+    showLandingArea(map, shapeType, fillType) {
+        if (null !== this.#landingArea) {
+            this.#landingArea.remove();
+            this.#landingArea = null;
+        }
+        if (null === this.#landingCluster)
+            return;
+
+        const polygonPoints = [];
+        if (DrawShapeTypes.ELLIPSE === shapeType) {
+            this.#landingCluster.ellipsePoints().forEach((ellipsePoint) => {
+                polygonPoints.push([ellipsePoint.latitude, ellipsePoint.longitude]);
+            });
+        } else if (DrawShapeTypes.POLYGON === shapeType) {
+            this.#landingCluster.convexHullPoints().forEach((hullPoint) => {
+                polygonPoints.push([hullPoint.latitude, hullPoint.longitude]);
+            });
+        } else if (DrawShapeTypes.BOX === shapeType) {
+            this.#landingCluster.obbPoints().forEach((boxPoint) => {
+                polygonPoints.push([boxPoint.latitude, boxPoint.longitude]);
+            });
+        } else {
+            return;
+        }
+
+        let polygonOpacity = 0.0;
+        if (ShapeFillTypes.SOLID === fillType) {
+            polygonOpacity = 1.0;
+        } else if (ShapeFillTypes.TRANSPARENT === fillType) {
+            polygonOpacity = 0.5;
+        }
+
+        this.#landingArea = L.polygon(polygonPoints,
+            {
+                color: `#${leafletColors[this.#colorIndex]}`,
+                fillColor: `#${leafletColors[this.#colorIndex]}`,
+                fillOpacity: polygonOpacity
+            });
+        this.#landingArea.addTo(map);
+
+        if (null != this.#apogee && this.#apogee > 0) {
+            const labelLocation = this.#landingCluster.centerLocation();
+
+            // Create the apogee tooltip.
+            this.#apogeeTooltip = L.tooltip()
+                .setLatLng([labelLocation.latitude, labelLocation.longitude])
+                .setContent(`<p>${this.#apogee} ft</p>`)
+                .addTo(map);
+        }
+    }
+
+    /** Hides the polygon surrounding this landing area before cleaning up the assets. */
+    hideLandingArea() {
+        if (null !== this.#landingArea) {
+            this.#landingArea.remove();
+            this.#landingArea = null;
+        }
+    }
+
+    /** Hides all Leaflet layers owned by this object. */
+    hideAll() {
+        this.hideMarkers();
+        this.hidePaths();
+        this.hideLandingArea();
+    }
+
+    /**
+     * Calculates the bounds surrounding all Leaflet objects within this landing area.
+     * @returns {Array.<Array.<number>>} - Contains coordinates for the upper-left and lower-right corners
+     */
+    getBounds() {
+        return this.#bounds;
+    }
+}
 
 /**
  * Update the value stored and displayed in the launch end time field.
@@ -361,6 +822,161 @@ function updateWindAtAltitudeDisplay() {
     windAltitudeDisplayElement.appendChild(windAltTable);
 }
 
+/** Creates a Leaflet map for display of drifting calucation results if one does not exist. */
+async function updateMapDisplay(forceNewDriftResults = false) {
+    const launchLocation = getLaunchSiteLocation();
+    if (null === launchLocation)
+        return;
+
+    if (forceNewDriftResults || 0 === altitudeDriftResults.length) {
+        // Try generating the drift results.
+        await calculateDriftResults();
+
+        if (0 === altitudeDriftResults.length)
+            return;
+    }
+
+    mapPreviewElement.hidden = false;
+
+    if (null === map_preview) {
+        // Initialize the map display
+        map_preview = L.map('map').setView([launchLocation.latitude, launchLocation.longitude], 13);
+
+        // Add a tile layer with OpenStreetMap data
+        osmLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        });
+        osmLayer.addTo(map_preview);
+
+        // Add a tile layer with USGS topgraphic data
+        topoLayer = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 16,
+            attribution: 'Tiles courtesy of the <a href="https://usgs.gov/">U.S. Geological Survey</a>'
+        });
+
+        // Add a tile layer with USGS satellite imagery
+        imageryLayer = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 16,
+            attribution: 'Tiles courtesy of the <a href="https://usgs.gov/">U.S. Geological Survey</a>'
+        });
+
+        // Create a layer selector within the map object
+        baseMaps = {
+            'Streets': osmLayer,
+            'Terrain': topoLayer,
+            'Imagery': imageryLayer
+        };
+        L.control.layers(baseMaps).addTo(map_preview);
+    }
+
+    // Place a red marker at the launch site's location.
+    if (null !== launchMarker) {
+        launchMarker.setLatLng([launchLocation.latitude, launchLocation.longitude]);
+    } else {
+        launchMarker = L.marker([launchLocation.latitude, launchLocation.longitude],
+            {
+                icon: leafletIcons[9],
+                draggable: false
+            }
+        );
+
+        launchMarkerLabel = L.tooltip({
+            content: 'Launch Site',
+            permanent: true
+        });
+        launchMarker.bindTooltip(launchMarkerLabel);
+        launchMarker.addTo(map_preview);
+    }
+
+    // Clear out any previously generated landing areas
+    if (landingAreas.length > 0) {
+        landingAreas.forEach((landingArea) => {
+            landingArea.hideAll();
+        })
+
+        landingAreas = [];
+    }
+
+    let leafletColorIndex = 0;
+    let driftBounds = [[-90.0, 180.0], [90.0, -180.0]];
+
+    altitudeDriftResults.forEach((altDriftResult) => {
+        let landingArea = new LeafletLandingArea(altDriftResult, leafletColorIndex++);
+        const landingAreaBounds = landingArea.getBounds();
+
+        if (landingAreaBounds[0][0] > driftBounds[0][0])
+            driftBounds[0][0] = landingAreaBounds[0][0];
+        if (landingAreaBounds[0][1] < driftBounds[0][1])
+            driftBounds[0][1] = landingAreaBounds[0][1];
+        if (landingAreaBounds[1][0] < driftBounds[1][0])
+            driftBounds[1][0] = landingAreaBounds[1][0];
+        if (landingAreaBounds[1][1] > driftBounds[1][1])
+            driftBounds[1][1] = landingAreaBounds[1][1];
+
+        landingAreas.push(landingArea);
+
+        if (leafletColorIndex >= 13) {
+            leafletColorIndex = 0;
+        }
+    });
+
+    map_preview.fitBounds(driftBounds);
+
+    // Identify which KML drawing options the user selected beginning with the shape
+    let mapShapeType = DrawShapeTypes.ELLIPSE;
+    switch (kmlShapeSelect.value) {
+        case 'kml-shape-polygon': { mapShapeType = DrawShapeTypes.POLYGON; break; }
+        case 'kml-shape-box': { mapShapeType = DrawShapeTypes.BOX; break; }
+        case 'kml-shape-none': { mapShapeType = DrawShapeTypes.NONE; break; }
+    }
+
+    // Next check how the user would like the shapes to be filled
+    let mapShapeFill = ShapeFillTypes.TRANSPARENT;
+    if ('kml-shape-fill-solid' === kmlShapeFillSelect.value) { mapShapeFill = ShapeFillTypes.SOLID; }
+    else if ('kml-shape-fill-none' === kmlShapeFillSelect.value) { mapShapeFill = ShapeFillTypes.NONE; }
+
+    // The final option is what type of paths to draw
+    let mapPathType = DrawPathTypes.GROUND;
+    switch (kmlPathSelect.value) {
+        case 'kml-path-flight': { mapPathType = DrawPathTypes.FLIGHT; break; }
+        case 'kml-path-both': { mapPathType = DrawPathTypes.BOTH; break; }
+        case 'kml-path-none': { mapPathType = DrawPathTypes.NONE; break; }
+    }
+
+    let kmlMarkerType = DrawMarkerTypes.NONE;
+    if ('kml-marker-time' === kmlMarkerSelect.value) {
+        kmlMarkerType = DrawMarkerTypes.TIMES;
+    } else if ('kml-marker-no-label' === kmlMarkerSelect.value) {
+        kmlMarkerType = DrawMarkerTypes.NO_LABEL;
+    }
+
+    // Add order is not supposed to effect render order, but duplicating KML behavior just to be safe.
+    if (mapPathType !== DrawPathTypes.NONE) {
+        landingAreas.forEach((landingArea) => { landingArea.showPaths(map_preview); });
+    }
+    landingAreas.forEach((landingArea) => { landingArea.showLandingArea(map_preview, mapShapeType, mapShapeFill); });
+
+    if (kmlMarkerType !== DrawMarkerTypes.NONE) {
+        const showLabels = kmlMarkerType === DrawMarkerTypes.TIMES;
+        landingAreas.forEach((landingArea) => { landingArea.showMarkers(map_preview, showLabels); });
+    }
+}
+
+/** Removes the map display and associated assets. */
+async function hideMapPreview() {
+    if (null === map_preview)
+        return;
+    
+    // Clear out any previously generated landing areas
+    landingAreas.forEach((landingArea) => {
+        landingArea.hideAll();
+    });
+    landingAreas = [];
+
+    mapPreviewElement.hidden = true;
+}
+
 /**
  * Fired when the whole page has loaded, including all dependent resources except
  * those that are loaded lazily.
@@ -483,8 +1099,6 @@ window.onload = () => {
         );
     });
 
-    weatherModelSelect.addEventListener('change', () => { updateWindAtAltitudeDisplay(); });
-
     eventNextButton.addEventListener('click', () => { processEventDetails(); });
 
     driftPreviousButton.addEventListener('click', () => {
@@ -497,6 +1111,16 @@ window.onload = () => {
     });
 
     driftNextButton.addEventListener('click', () => { processLaunchAltitudeBands(); });
+
+    weatherModelSelect.addEventListener('change', () => {
+        updateWindAtAltitudeDisplay();
+        updateMapDisplay(true);
+    });
+
+    kmlShapeSelect.addEventListener('change', () => { updateMapDisplay(); });
+    kmlShapeFillSelect.addEventListener('change', () => { updateMapDisplay(); });
+    kmlPathSelect.addEventListener('change', () => { updateMapDisplay(); });
+    kmlMarkerSelect.addEventListener('change', () => { updateMapDisplay(); });
 
     drawPreviousButton.addEventListener('click', () => {
         // Clear the existing list of altitude bands.
@@ -511,15 +1135,13 @@ window.onload = () => {
 
         detailCardContainer.classList.remove(drawDetailCardClass);
         detailCardContainer.classList.add(driftDetailCardClass);
+
+        hideMapPreview();
     });
 
     saveKmlFileButton.addEventListener('click', async () => {
         // Let the user know something is happening in the background.
         updateStatusDisplay('Generating KML file...');
-
-        if (0 === altitudeDriftResults.length) {
-            calculateDriftResults();
-        }
 
         // Calculate new drift and landing results
         saveDriftResultsKML();
@@ -659,6 +1281,7 @@ async function processLaunchAltitudeBands() {
     }
 
     updateWindAtAltitudeDisplay();
+    updateMapDisplay();
 
     // Everything looks okay. Transition to the next detail card.
     detailCardContainer.classList.remove(driftDetailCardClass);
